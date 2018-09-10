@@ -4,4 +4,4 @@ mpi4py == 2.0.0
 mpich2 == 1.4.1p1 (should be included when getting mpi4py)
 numpy == 1.13.3
 pandas == 0.21.0 (should work with up-to-date 0.23.4)
-pillow == 5.2.0
+pillow == 5.2.0 (this is the fork of PIL, *not* PIL itself)
