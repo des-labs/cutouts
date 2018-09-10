@@ -48,6 +48,23 @@ comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
 rank = comm.Get_rank()
 
+def _DecConverter(ra, dec):
+	ra1 = np.abs(ra/15)
+	raHH = int(ra1)
+	raMM = int((ra1 - raHH) * 60)
+	raSS = (((ra1 - raHH) * 60) - raMM) * 60
+	raSS = np.round(raSS, decimals=1)
+	raOUT = '{0:02d}{1:02d}{2:04.1f}'.format(raHH, raMM, raSS) if ra > 0 else '-{0:02d}{1:02d}{2:04.1f}'.format(raHH, raMM, raSS)
+	
+	dec1 = np.abs(dec)
+	decDD = int(dec1)
+	decMM = int((dec1 - decDD) * 60)
+	decSS = (((dec1 - decDD) * 60) - decMM) * 60
+	decSS = np.round(decSS, decimals=1)
+	decOUT = '-{0:02d}{1:02d}{2:04.1f}'.format(decDD, decMM, decSS) if dec < 0 else '+{0:02d}{1:02d}{2:04.1f}'.format(decDD, decMM, decSS)
+	
+	return raOUT + decOUT
+
 def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 	logger = logging.getLogger(__name__)
 	os.makedirs(outdir, exist_ok=True)
@@ -93,6 +110,7 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 			filenm = outdir + str(df['COADD_OBJECT_ID'][i])
 		else:
 			filenm = outdir + 'x{0}y{1}'.format(df['RA'][i], df['DEC'][i])
+			#filenm = outdir + 'DESJ' + _DecConverter(df['RA'][0], df['DEC'][0])
 		left = pixcoords[0][i] - dx
 		upper = im.size[1] - pixcoords[1][i] - dy
 		right = pixcoords[0][i] + dx
@@ -127,6 +145,7 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 				filenm = outdir + '{0}_{1}.fits'.format(df['COADD_OBJECT_ID'][p], colors[c].lower())
 			else:
 				filenm = outdir + 'x{0}y{1}_{2}.fits'.format(df['RA'][p], df['DEC'][p], colors[c].lower())
+				#filenm = outdir + 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p]) + '_{}.fits'.format(colors[c].lower())
 			newhdul = fits.HDUList()
 			
 			# Iterate over all HDUs in the tile
