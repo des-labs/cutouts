@@ -44,6 +44,9 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = 144000000		# allows Pillow to not freak out at a large filesize
 ARCMIN_TO_DEG = 0.0166667		# deg per arcmin
 
+TILES_FOLDER = '/tiles_sample' #'/tiles'
+OUTDIR = '/output'
+
 comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
 rank = comm.Get_rank()
@@ -135,7 +138,8 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 			tilename = glob.glob(tiledir + '*_{}.fits.fz'.format(colors[c].lower()))
 		try:
 			hdul = fits.open(tilename[0])
-		except IOError as e:
+		#except IOError as e:
+		except IndexError as e:
 			print('No FITS file in {0} color band found. Will not create cutouts in this band.'.format(colors[c]))
 			logger.error('MakeFitsCut - No FITS file in {0} color band found. Will not create cutouts in this band.'.format(colors[c]))
 			continue		# Just go on to the next color in the list
@@ -237,7 +241,8 @@ def run(args):
 		
 		usernm = str(conn.user)
 		jobid = str(uuid.uuid4())
-		outdir = usernm + '/' + jobid + '/'
+		#outdir = usernm + '/' + jobid + '/'
+		outdir = OUTDIR + '/' + usernnm + '/' + jobid + '/'
 		tablename = 'BTL_'+jobid.upper().replace("-","_")	# "BulkThumbs_List_<jobid>"
 		
 		if 'RA' in userdf:
@@ -318,7 +323,8 @@ def run(args):
 	
 	tilenm = df['TILENAME'].unique()
 	for i in tilenm:
-		tiledir = 'tiles_sample/' + i + '/'
+		#tiledir = 'tiles_sample/' + i + '/'
+		tiledir = TILES_FOLDER + '/' + i + '/'
 		udf = df[ df.TILENAME == i ]
 		udf = udf.reset_index()
 		
