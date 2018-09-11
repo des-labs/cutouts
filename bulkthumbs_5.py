@@ -42,6 +42,9 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = 144000000		# allows Pillow to not freak out at a large filesize
 ARCMIN_TO_DEG = 0.0166667		# deg per arcmin
 
+TILES_FOLDER = '/tiles'
+OUTDIR = '/output'
+
 comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
 rank = comm.Get_rank()
@@ -187,7 +190,7 @@ def run(args):
 		
 		usernm = str(conn.user)
 		jobid = str(uuid.uuid4())
-		outdir = usernm + '/' + jobid + '/'
+		outdir = OUTDIR + '/' + usernm + '/' + jobid + '/'
 		tablename = 'BTL_'+jobid.upper().replace("-","_")	# "BulkThumbs_List_<jobid>"
 		
 		if 'RA' in userdf:
@@ -264,7 +267,7 @@ def run(args):
 	
 	tilenm = df['TILENAME'].unique()
 	for i in tilenm:
-		tiledir = 'tiles_sample/' + i + '/'
+		tiledir = TILES_FOLDER + '/' + i + '/'
 		udf = df[ df.TILENAME == i ]
 		udf = udf.reset_index()
 		
