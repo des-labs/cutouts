@@ -57,9 +57,14 @@ ADD default-mca-params.conf ${HOME}/.openmpi/mca-params.conf
 
 WORKDIR ${HOME}
 RUN mkdir ${HOME}/test
+RUN mkdir ${HOME}/cutouts
+RUN mkdir /output
 ADD test/* ${HOME}/test/.
+ADD bulkthumbs.py ${HOME}/cutouts/.
 RUN chown -R ${USER}:${USER} ${HOME}
+RUN chown -R ${USER}:${USER} /output
 USER ${USER}
+RUN chmod a+r ${HOME}/cutouts/bulkthumbs.py
 ENV SHELL /bin/bash
 ENV TERM xterm
 
