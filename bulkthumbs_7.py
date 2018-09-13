@@ -2,21 +2,15 @@
 
 """
 TESTS:
-Options: time mpirun -n 6 python bulkthumbs_6.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
+Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
 	135,518 objects across 12 tiles, 135,518 files created totalling 17.4 GiB
-	1 core: (ncsa) 
-	2 cores: (ncsa) 
-	4 cores: (ncsa) 
-	6 cores: (ncsa) 6m50s, query 15.2s
-
-Options: time mpirun -n 6 python bulkthumbs_6.py --csv des_tiles_sample_133368_coords.csv --make_pngs --xsize 1 --ysize 1
-	133,368 objects across 12 tiles, ? files created totalling ? GiB
-	1 core: (ncsa) 
-	2 cores: (ncsa) 
-	4 cores: (ncsa) 
 	6 cores: (ncsa) 
 
-Options: time mpirun -n 6 python bulkthumbs_6.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --make_fits --colors g,r,i,z,y --xsize 1 --ysize 1
+Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_133368_coords.csv --make_pngs --xsize 1 --ysize 1
+	133,368 objects across 12 tiles, ? files created totalling ? GiB
+	6 cores: (ncsa) 
+
+Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --make_fits --colors g,r,i,z,y --xsize 1 --ysize 1
 	6 cores: 
 """
 
@@ -44,8 +38,8 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = 144000000		# allows Pillow to not freak out at a large filesize
 ARCMIN_TO_DEG = 0.0166667		# deg per arcmin
 
-TILES_FOLDER = '/tiles'
-OUTDIR = '/output'
+TILES_FOLDER = 'tiles/'
+OUTDIR = 'output/'
 
 comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
@@ -73,7 +67,7 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 	os.makedirs(outdir, exist_ok=True)
 	
 	imgname = glob.glob(tiledir + '*.tiff')
-	print(imgname)
+	#print(imgname)
 	try:
 		im = Image.open(imgname[0])
 	#except IOError as e:
@@ -186,7 +180,7 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 
 def run(args):
 	logname = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-	logging.basicConfig(filename='BulkThumbs_'+logname+'_Rank_'+str(rank)+'.log', format='%(asctime)s - %(levelname)-8s - %(message)s', level=logging.INFO)
+	logging.basicConfig(filename=OUTDIR + 'BulkThumbs_'+logname+'_Rank_'+str(rank)+'.log', format='%(asctime)s - %(levelname)-8s - %(message)s', level=logging.INFO)
 	logger = logging.getLogger(__name__)
 	logger.info('Rank: '+str(rank)+'\n')
 	
@@ -242,24 +236,22 @@ def run(args):
 		usernm = str(conn.user)
 		jobid = str(uuid.uuid4())
 		#outdir = usernm + '/' + jobid + '/'
-		outdir = OUTDIR + '/' + usernnm + '/' + jobid + '/'
+		outdir = OUTDIR + usernm + '/' + jobid + '/'
 		tablename = 'BTL_'+jobid.upper().replace("-","_")	# "BulkThumbs_List_<jobid>"
 		
 		if 'RA' in userdf:
-			print(userdf.head())
-			
 			if args.db == 'Y3A2':
 				ra_adjust = [360-userdf['RA'][i] if userdf['RA'][i]>180 else userdf['RA'][i] for i in range(len(userdf['RA']))]
 				userdf = userdf.assign(RA_ADJUSTED = ra_adjust)
-				userdf.to_csv(tablename+'.csv', index=False)
-				conn.load_table(tablename+'.csv', name=tablename)
+				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
+				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
 				
 				#query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from Y3A2_COADDTILE_GEOM m, {} temp where (m.CROSSRA0='N' and (temp.RA between m.RACMIN and m.RACMAX) and (temp.DEC between m.DECCMIN and m.DECCMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.RACMIN-360 and m.RACMAX) and (temp.DEC between m.DECCMIN and m.DECCMAX))".format(tablename)
 				query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
 				
 				df = conn.query_to_pandas(query)
 				curs.execute('drop table {}'.format(tablename))
-				os.remove(tablename+'.csv')
+				os.remove(OUTDIR+tablename+'.csv')
 				
 				df = df.replace('-9999',np.nan)
 				dftemp = df[df.isnull().any(axis=1)]
@@ -309,9 +301,6 @@ def run(args):
 		
 		conn.close()
 		df = df.sort_values(by=['TILENAME'])
-		
-		#chunksize = int(df.shape[0] / nprocs) + (df.shape[0] % nprocs)
-		#df = [ df[ i:i+chunksize ] for i in range(0, df.shape[0], chunksize) ]
 		df = np.array_split(df, nprocs)
 		
 		end = time.time()
@@ -335,20 +324,20 @@ def run(args):
 	tilenm = df['TILENAME'].unique()
 	for i in tilenm:
 		#tiledir = 'tiles_sample/' + i + '/'
-		tiledir = TILES_FOLDER + '/' + i + '/'
+		tiledir = TILES_FOLDER + i + '/'
 		udf = df[ df.TILENAME == i ]
 		udf = udf.reset_index()
-		
-		outdir += i + '/'
 		
 		size = u.Quantity((ys, xs), u.arcmin)
 		positions = SkyCoord(udf['ALPHAWIN_J2000'], udf['DELTAWIN_J2000'], frame='icrs', unit='deg', equinox='J2000', representation_type='spherical')
 		
 		if args.make_tiffs or args.make_pngs:
-			MakeTiffCut(tiledir, outdir, positions, xs, ys, udf, args.make_tiffs, args.make_pngs)
+			MakeTiffCut(tiledir, outdir+i+'/', positions, xs, ys, udf, args.make_tiffs, args.make_pngs)
 		
 		if args.make_fits:
-			MakeFitsCut(tiledir, outdir, size, positions, colors, udf)
+			MakeFitsCut(tiledir, outdir+i+'/', size, positions, colors, udf)
+	
+	comm.Barrier()
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description="This program will make any number of cutouts, using the master tiles.")
