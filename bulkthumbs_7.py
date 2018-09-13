@@ -67,7 +67,6 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 	os.makedirs(outdir, exist_ok=True)
 	
 	imgname = glob.glob(tiledir + '*.tiff')
-	#print(imgname)
 	try:
 		im = Image.open(imgname[0])
 	#except IOError as e:
@@ -274,6 +273,8 @@ def run(args):
 						unmatched_coords['DEC'].append(userdf['DEC'][i])
 					else:	
 						df = df.append(f)
+			logger.info('Unmatched coordinates: \n{0}\n{1}'.format(unmatched_coords['RA'], unmatched_coords['DEC'])
+			print(unmatched_coords)
 		
 		if 'COADD_OBJECT_ID' in userdf:
 			if args.db == 'Y3A2':
@@ -298,6 +299,8 @@ def run(args):
 						unmatched_coadds.append(userdf['COADD_OBJECT_ID'][i])
 					else:
 						df = df.append(f)
+			logger.info('Unmatched coadd ID\'s: \n{}'.format(unmatched_coadds)
+			print(unmatched_coadds)
 		
 		conn.close()
 		df = df.sort_values(by=['TILENAME'])
@@ -305,8 +308,6 @@ def run(args):
 		
 		end = time.time()
 		print('Querying took (s): ' + str(end-start))
-		print(unmatched_coords)
-		print(unmatched_coadds)
 		logger.info('Querying took (s): ' + str(end-start))
 		if db == 'desdr':
 			logger.info('For coords input and DR1 db, \nUnmatched Coords: ' + str(unmatched_coords))
@@ -338,6 +339,19 @@ def run(args):
 			MakeFitsCut(tiledir, outdir+i+'/', size, positions, colors, udf)
 	
 	comm.Barrier()
+	
+	if rank == 0:
+		dirsize = os.path.getsize(outdir)
+		dirsize = dirsize * 1. / 1024		# KiB
+		if dirsize > 1024. * 1024:		# MiB
+			dirsize = '{}.2f GB'.format(1. * dirsize / 1024. / 1024)
+		elif dirsize > 1024.:		# KiB
+			dirsize = '{}.2f MB'.format(1. * dirsize / 1024.)
+		else:		# KiB
+			dirsize = '{}.2f'.format(dirsize)
+		
+		logger.info('All processes finished.')
+		logger.info('Total file size on disk: {}'.format(dirsize))
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description="This program will make any number of cutouts, using the master tiles.")
