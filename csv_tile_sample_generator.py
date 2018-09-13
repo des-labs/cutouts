@@ -4,43 +4,44 @@ import easyaccess as ea
 import pandas as pd
 import random
 
+m = 10000
 total = 0
-r = random.randint(1, 10000)
+r = random.randint(1, m)
 total += r
-query1 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0120-2706\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query1 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0120-2706\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query2 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0133-4914\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query2 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0133-4914\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query3 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0148-1707\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query3 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0148-1707\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query4 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0202-3749\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query4 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0202-3749\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query5 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0210-1624\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query5 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0210-1624\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query6 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0227-0958\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query6 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0227-0958\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query7 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0232-3206\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query7 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0232-3206\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query8 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0308-1958\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query8 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0308-1958\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query9 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0311-3749\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query9 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0311-3749\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query10 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES0435-2623\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query10 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0435-2623\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query11 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES2147-5540\') where rownum<{};'.format(r)
-r = random.randint(1, 10000)
+query11 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES2147-5540\') where rownum<{};'.format(r)
+r = random.randint(1, m)
 total += r
-query12 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.RACMIN+0.1 and m.RACMAX-0.1) and (t.DEC between m.DECCMIN+0.1 and m.DECCMAX-0.1) and t.TILENAME=\'DES2246-4914\') where rownum<{};'.format(r)
+query12 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES2246-4914\') where rownum<{};'.format(r)
 
 """
 total = 0
