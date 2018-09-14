@@ -113,6 +113,10 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 		lower = min(im.size[1] - pixcoords[1][i] + dy, 10000)
 		newimg = im.crop((left, upper, right, lower))
 		
+		print(newimg.size, 2*dx, 2*dy)
+		if newimg.size != (2*dx, 2*dy):
+			print('Urgh!')
+		
 		if maketiff:
 			newimg.save(filenm+'.tiff', format='TIFF')
 		if makepngs:
