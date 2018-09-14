@@ -107,10 +107,10 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 		else:
 			filenm = outdir + 'x{0}y{1}'.format(df['RA'][i], df['DEC'][i])
 			#filenm = outdir + 'DESJ' + _DecConverter(df['RA'][0], df['DEC'][0])
-		left = pixcoords[0][i] - dx
-		upper = im.size[1] - pixcoords[1][i] - dy
-		right = pixcoords[0][i] + dx
-		lower = im.size[1] - pixcoords[1][i] + dy
+		left = max(0, pixcoords[0][i] - dx)
+		upper = max(0, im.size[1] - pixcoords[1][i] - dy)
+		right = min(pixcoords[0][i] + dx, 10000)
+		lower = min(im.size[1] - pixcoords[1][i] + dy, 10000)
 		newimg = im.crop((left, upper, right, lower))
 		
 		if maketiff:
@@ -209,7 +209,7 @@ def run(args):
 			coords['DEC'] = args.dec
 			userdf = pd.DataFrame.from_dict(coords, orient='columns')
 			logger.info('    RA: '+str(args.ra))
-			logger.info('    DEC: '+str(arg.dec))
+			logger.info('    DEC: '+str(args.dec))
 		elif args.coadd:
 			coadds = {}
 			coadds['COADD_OBJECT_ID'] = args.coadd
@@ -273,7 +273,7 @@ def run(args):
 						unmatched_coords['DEC'].append(userdf['DEC'][i])
 					else:	
 						df = df.append(f)
-			logger.info('Unmatched coordinates: \n{0}\n{1}'.format(unmatched_coords['RA'], unmatched_coords['DEC'])
+			logger.info('Unmatched coordinates: \n{0}\n{1}'.format(unmatched_coords['RA'], unmatched_coords['DEC']))
 			print(unmatched_coords)
 		
 		if 'COADD_OBJECT_ID' in userdf:
@@ -299,7 +299,7 @@ def run(args):
 						unmatched_coadds.append(userdf['COADD_OBJECT_ID'][i])
 					else:
 						df = df.append(f)
-			logger.info('Unmatched coadd ID\'s: \n{}'.format(unmatched_coadds)
+			logger.info('Unmatched coadd ID\'s: \n{}'.format(unmatched_coadds))
 			print(unmatched_coadds)
 		
 		conn.close()
@@ -325,7 +325,8 @@ def run(args):
 	tilenm = df['TILENAME'].unique()
 	for i in tilenm:
 		#tiledir = 'tiles_sample/' + i + '/'
-		tiledir = TILES_FOLDER + i + '/'
+		#tiledir = TILES_FOLDER + i + '/'
+		tiledir = 'DES0210-1624/'
 		udf = df[ df.TILENAME == i ]
 		udf = udf.reset_index()
 		
