@@ -95,7 +95,6 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 	w = WCS(hdul['SCI'].header)
 	
 	pixelscale = utils.proj_plane_pixel_scales(w)
-	
 	dx = int(0.5 * xs * ARCMIN_TO_DEG / pixelscale[0])		# pixelscale is in degrees (CUNIT)
 	dy = int(0.5 * ys * ARCMIN_TO_DEG / pixelscale[1])
 	
@@ -113,9 +112,8 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 		lower = min(im.size[1] - pixcoords[1][i] + dy, 10000)
 		newimg = im.crop((left, upper, right, lower))
 		
-		print(newimg.size, 2*dx, 2*dy)
 		if newimg.size != (2*dx, 2*dy):
-			print('Urgh!')
+			logger.info('MakeTiffCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(filenm.split('/')[-1]))
 		
 		if maketiff:
 			newimg.save(filenm+'.tiff', format='TIFF')
@@ -147,7 +145,9 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 			else:
 				filenm = outdir + 'x{0}y{1}_{2}.fits'.format(df['RA'][p], df['DEC'][p], colors[c].lower())
 				#filenm = outdir + 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p]) + '_{}.fits'.format(colors[c].lower())
+			
 			newhdul = fits.HDUList()
+			pixelscale = None
 			
 			# Iterate over all HDUs in the tile
 			for i in range(len(hdul)):
@@ -173,9 +173,15 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 				
 				if not newhdul:
 					newhdu = fits.PrimaryHDU(data=cutout.data, header=header)
+					pixelscale = utils.proj_plane_pixel_scales(w)
 				else:
 					newhdu = fits.ImageHDU(data=cutout.data, header=header, name=h['EXTNAME'])
 				newhdul.append(newhdu)
+			
+			dx = int(size[1] * ARCMIN_TO_DEG / pixelscale[0] / u.arcmin)		# pixelscale is in degrees (CUNIT)
+			dy = int(size[0] * ARCMIN_TO_DEG / pixelscale[1] / u.arcmin)
+			if (newhdul[0].header['NAXIS1'], newhdul[0].header['NAXIS2']) != (dx, dy):
+				logger.info('MakeFitsCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(filenm.split('/')[-1]))
 			
 			newhdul.writeto(filenm, output_verify='exception', overwrite=True, checksum=False)
 			newhdul.close()
@@ -349,11 +355,11 @@ def run(args):
 		dirsize = os.path.getsize(outdir)
 		dirsize = dirsize * 1. / 1024		# KiB
 		if dirsize > 1024. * 1024:		# MiB
-			dirsize = '{}.2f GB'.format(1. * dirsize / 1024. / 1024)
+			dirsize = '{0:.2f} GB'.format(1. * dirsize / 1024. / 1024)
 		elif dirsize > 1024.:		# KiB
-			dirsize = '{}.2f MB'.format(1. * dirsize / 1024.)
+			dirsize = '{0:.2f} MB'.format(1. * dirsize / 1024.)
 		else:		# KiB
-			dirsize = '{}.2f'.format(dirsize)
+			dirsize = '{0:.2f} KB'.format(dirsize)
 		
 		logger.info('All processes finished.')
 		logger.info('Total file size on disk: {}'.format(dirsize))
