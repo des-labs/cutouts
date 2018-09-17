@@ -45,6 +45,22 @@ comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
 rank = comm.Get_rank()
 
+def getPathSize(path):
+	dirsize = 0
+	"""
+	for path, dirs, files in os.walk(path):
+		for f in files:
+			fpath = os.path.join(path, f)
+			dirsize += os.path.getsize(fpath)
+	"""
+	for entry in os.scandir(path):
+		if entry.is_dir(follow_symlinks=False):
+			dirsize += getPathSize(entry.path)
+		else:
+			dirsize += os.path.getsize(entry)
+	
+	return dirsize
+
 def _DecConverter(ra, dec):
 	ra1 = np.abs(ra/15)
 	raHH = int(ra1)
@@ -178,10 +194,11 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 					newhdu = fits.ImageHDU(data=cutout.data, header=header, name=h['EXTNAME'])
 				newhdul.append(newhdu)
 			
-			dx = int(size[1] * ARCMIN_TO_DEG / pixelscale[0] / u.arcmin)		# pixelscale is in degrees (CUNIT)
-			dy = int(size[0] * ARCMIN_TO_DEG / pixelscale[1] / u.arcmin)
-			if (newhdul[0].header['NAXIS1'], newhdul[0].header['NAXIS2']) != (dx, dy):
-				logger.info('MakeFitsCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(filenm.split('/')[-1]))
+			if pixelscale is not None:
+				dx = int(size[1] * ARCMIN_TO_DEG / pixelscale[0] / u.arcmin)		# pixelscale is in degrees (CUNIT)
+				dy = int(size[0] * ARCMIN_TO_DEG / pixelscale[1] / u.arcmin)
+				if (newhdul[0].header['NAXIS1'], newhdul[0].header['NAXIS2']) != (dx, dy):
+					logger.info('MakeFitsCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(filenm.split('/')[-1]))
 			
 			newhdul.writeto(filenm, output_verify='exception', overwrite=True, checksum=False)
 			newhdul.close()
@@ -334,9 +351,8 @@ def run(args):
 	
 	tilenm = df['TILENAME'].unique()
 	for i in tilenm:
-		#tiledir = 'tiles_sample/' + i + '/'
-		#tiledir = TILES_FOLDER + i + '/'
-		tiledir = 'DES0210-1624/'
+		tiledir = TILES_FOLDER + i + '/'
+		#tiledir = 'DES0210-1624/'
 		udf = df[ df.TILENAME == i ]
 		udf = udf.reset_index()
 		
@@ -352,17 +368,21 @@ def run(args):
 	comm.Barrier()
 	
 	if rank == 0:
-		dirsize = os.path.getsize(outdir)
-		dirsize = dirsize * 1. / 1024		# KiB
-		if dirsize > 1024. * 1024:		# MiB
+		pt1 = time.time()
+		dirsize = getPathSize(outdir)
+		
+		dirsize = dirsize * 1. / 1024
+		if dirsize > 1024. * 1024:
 			dirsize = '{0:.2f} GB'.format(1. * dirsize / 1024. / 1024)
-		elif dirsize > 1024.:		# KiB
+		elif dirsize > 1024.:
 			dirsize = '{0:.2f} MB'.format(1. * dirsize / 1024.)
-		else:		# KiB
+		else:
 			dirsize = '{0:.2f} KB'.format(dirsize)
 		
 		logger.info('All processes finished.')
 		logger.info('Total file size on disk: {}'.format(dirsize))
+		pt2 = time.time()
+		print('{} seconds'.format(pt2 - pt1))
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description="This program will make any number of cutouts, using the master tiles.")
