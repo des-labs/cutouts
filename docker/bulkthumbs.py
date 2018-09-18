@@ -4,7 +4,7 @@
 TESTS:
 Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
 	135,518 objects across 12 tiles, 135,518 files created totalling 17.4 GiB
-	6 cores: (ncsa) 
+	6 cores: (ncsa) 6m40s, query 2.89s
 
 Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_133368_coords.csv --make_pngs --xsize 1 --ysize 1
 	133,368 objects across 12 tiles, ? files created totalling ? GiB
@@ -305,12 +305,14 @@ def run(args):
 		
 		if 'COADD_OBJECT_ID' in userdf:
 			if args.db == 'Y3A2':
-				conn.load_table(args.csv, name=tablename)
+				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
+				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
 				
 				query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
 				
 				df = conn.query_to_pandas(query)
 				curs.execute('drop table {}'.format(tablename))
+				os.remove(OUTDIR+tablename+'.csv')
 				
 				df = df.replace('-9999',np.nan)
 				df = df.replace(-9999.000000,np.nan)
