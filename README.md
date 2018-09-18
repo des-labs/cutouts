@@ -1,12 +1,8 @@
 # cutouts
 
-Current working version: bulkthumbs_5.py
+Current working version: bulkthumbs_7.py
 
-Current development version: #6
-
-**To change the master tile directory:** bulkthumbs_5 - L267
-
-**To change the output directory:** bulkthumbs_5 - L190
+Current development version: #8
 
 ## Requirements (also in requirments.txt in master branch):
 ```
@@ -20,7 +16,7 @@ pillow == 5.2.0 (this is the fork of PIL, *not* PIL itself)
 ```
 ## Options when running (from the built-in help):
 ```
-usage: bulkthumbs_5.py [-h] [--csv CSV] [--ra [RA [RA ...]]]
+usage: bulkthumbs_7.py [-h] [--csv CSV] [--ra [RA [RA ...]]]
                        [--dec [DEC [DEC ...]]] [--coadd [COADD [COADD ...]]]
                        [--make_tiffs] [--make_fits] [--make_pngs]
                        [--xsize XSIZE] [--ysize YSIZE] [--colors COLORS]
@@ -47,7 +43,7 @@ optional arguments:
                         Y3A2.
 ```
 ### Example using a CSV:
-`mpirun -n 6 python bulkthumbs_5.py --csv <user/path/to/csv/file> --make_pngs --make_fits --xsize 3 --ysize 2 --colors r,Y --db Y3A2`
+`mpirun -n 6 python bulkthumbs_7.py --csv <user/path/to/csv/file> --make_pngs --make_fits --xsize 3 --ysize 2 --colors r,Y --db Y3A2`
 
 ### Example using a list of coordinates:
-`mpirun -n 6 python bulkthumbs_5.py --ra 4.9703 10.1415 --dec -48.9987 -62.0329 --make_pngs --make_fits --xsize 1 --ysize 1 --colors g,r,i,z,Y --db Y3A2`
+`mpirun -n 6 python bulkthumbs_7.py --ra 4.9703 10.1415 --dec -48.9987 -62.0329 --make_pngs --make_fits --xsize 1 --ysize 1 --colors g,r,i,z,Y --db Y3A2`
