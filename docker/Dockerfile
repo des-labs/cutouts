@@ -46,6 +46,7 @@ RUN pip install  Pillow
 RUN pip install  pyfits
 RUN pip install astropy
 RUN pip install mpi4py
+RUN pip install pyyaml
 
 
 ENV USER des
@@ -61,6 +62,7 @@ RUN mkdir ${HOME}/cutouts
 RUN mkdir /output
 ADD test/* ${HOME}/test/.
 ADD bulkthumbs.py ${HOME}/cutouts/.
+RUN mkdir ${HOME}/cutouts/config
 RUN chown -R ${USER}:${USER} ${HOME}
 RUN chown -R ${USER}:${USER} /output
 USER ${USER}
