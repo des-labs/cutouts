@@ -2,16 +2,11 @@
 
 """
 TESTS:
-Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
-	135,518 objects across 12 tiles, 135,518 files created totalling 17.4 GiB
-	6 cores: (ncsa) 6m40s, query 2.89s
-
-Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_133368_coords.csv --make_pngs --xsize 1 --ysize 1
-	133,368 objects across 12 tiles, ? files created totalling ? GiB
+Options: time mpirun -n 6 python bulkthumbs_8.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
 	6 cores: (ncsa) 
 
-Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --make_fits --colors g,r,i,z,y --xsize 1 --ysize 1
-	6 cores: 
+Options: time mpirun -n 6 python bulkthumbs_8.py --csv des_tiles_sample_129412_coords.csv --make_pngs --xsize 1 --ysize 1
+	6 cores: (ncsa) 
 """
 
 import os, sys
@@ -24,6 +19,8 @@ import easyaccess as ea
 import numpy as np
 import pandas as pd
 import uuid
+import json
+import yaml
 from astropy import units as u
 from astropy.io import fits
 from astropy.nddata import Cutout2D
@@ -38,27 +35,44 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = 144000000		# allows Pillow to not freak out at a large filesize
 ARCMIN_TO_DEG = 0.0166667		# deg per arcmin
 
-TILES_FOLDER = 'tiles/'
-OUTDIR = 'output/'
+TILES_FOLDER = '' #'tiles/'
+OUTDIR = '' #'output/'
 
 comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
 rank = comm.Get_rank()
 
+class MPILogHandler(logging.FileHandler):
+	def __init__(self, filename, comm, amode=mpi.MODE_WRONLY|mpi.MODE_CREATE|mpi.MODE_APPEND):
+		self.comm = comm
+		self.filename = filename
+		self.amode = amode
+		self.encoding = 'utf-8'
+		logging.StreamHandler.__init__(self, self._open())
+	def _open(self):
+		stream = mpi.File.Open(self.comm, self.filename, self.amode)
+		stream.Set_atomicity(True)
+		return stream
+	def emit(self, record):
+		try:
+			msg = self.format(record)
+			stream = self.stream
+			stream.Write_shared((msg+self.terminator).encode(self.encoding))
+		except Exception:
+			self.handleError(record)
+	def close(self):
+		if self.stream:
+			self.stream.Sync()
+			self.stream.Close()
+			self.stream = None
+
 def getPathSize(path):
 	dirsize = 0
-	"""
-	for path, dirs, files in os.walk(path):
-		for f in files:
-			fpath = os.path.join(path, f)
-			dirsize += os.path.getsize(fpath)
-	"""
 	for entry in os.scandir(path):
 		if entry.is_dir(follow_symlinks=False):
 			dirsize += getPathSize(entry.path)
 		else:
 			dirsize += os.path.getsize(entry)
-	
 	return dirsize
 
 def _DecConverter(ra, dec):
@@ -85,7 +99,6 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 	imgname = glob.glob(tiledir + '*.tiff')
 	try:
 		im = Image.open(imgname[0])
-	#except IOError as e:
 	except IndexError as e:
 		print('No TIFF file found for tile ' + df['TILENAME'][0] + '. Will not create true-color cutout.')
 		logger.error('MakeTiffCut - No TIFF file found for tile ' + df['TILENAME'][0] + '. Will not create true-color cutout.')
@@ -128,13 +141,14 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 		lower = min(im.size[1] - pixcoords[1][i] + dy, 10000)
 		newimg = im.crop((left, upper, right, lower))
 		
-		if newimg.size != (2*dx, 2*dy):
-			logger.info('MakeTiffCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(filenm.split('/')[-1]))
-		
 		if maketiff:
-			newimg.save(filenm+'.tiff', format='TIFF')
+			filenm += '.tiff'
+			newimg.save(filenm, format='TIFF')
 		if makepngs:
-			newimg.save(filenm+'.png', format='PNG')
+			filenm += '.png'
+			newimg.save(filenm, format='PNG')
+		if newimg.size != (2*dx, 2*dy):
+			logger.info('MakeTiffCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(('/').join(filenm.split('/')[-2:])))
 	logger.info('MakeTiffCut - Tile {} complete.'.format(df['TILENAME'][0]))
 
 def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
@@ -149,7 +163,6 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 			tilename = glob.glob(tiledir + '*_{}.fits.fz'.format(colors[c].lower()))
 		try:
 			hdul = fits.open(tilename[0])
-		#except IOError as e:
 		except IndexError as e:
 			print('No FITS file in {0} color band found. Will not create cutouts in this band.'.format(colors[c]))
 			logger.error('MakeFitsCut - No FITS file in {0} color band found. Will not create cutouts in this band.'.format(colors[c]))
@@ -198,17 +211,24 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 				dx = int(size[1] * ARCMIN_TO_DEG / pixelscale[0] / u.arcmin)		# pixelscale is in degrees (CUNIT)
 				dy = int(size[0] * ARCMIN_TO_DEG / pixelscale[1] / u.arcmin)
 				if (newhdul[0].header['NAXIS1'], newhdul[0].header['NAXIS2']) != (dx, dy):
-					logger.info('MakeFitsCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(filenm.split('/')[-1]))
+					logger.info('MakeFitsCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(('/').join(filenm.split('/')[-2:])))
 			
 			newhdul.writeto(filenm, output_verify='exception', overwrite=True, checksum=False)
 			newhdul.close()
 	logger.info('MakeFitsCut - Tile {} complete.'.format(df['TILENAME'][0]))
 
 def run(args):
-	logname = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-	logging.basicConfig(filename=OUTDIR + 'BulkThumbs_'+logname+'_Rank_'+str(rank)+'.log', format='%(asctime)s - %(levelname)-8s - %(message)s', level=logging.INFO)
+	logtime = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
+	logname = OUTDIR + 'BulkThumbs_' + logtime + '.log'
+	formatter = logging.Formatter('%(asctime)s - '+str(rank)+' - %(levelname)-8s - %(message)s')
+	
 	logger = logging.getLogger(__name__)
-	logger.info('Rank: '+str(rank)+'\n')
+	logger.setLevel(logging.INFO)
+	
+	fh = MPILogHandler(logname, comm)
+	fh.setLevel(logging.INFO)
+	fh.setFormatter(formatter)
+	logger.addHandler(fh)
 	
 	xs = float(args.xsize)
 	ys = float(args.ysize)
@@ -218,6 +238,8 @@ def run(args):
 	outdir = ''
 	
 	if rank == 0:
+		#sumlog = open(OUTDIR + 'BulkThumbs_'+logtime+'_SUMMARY.log', 'w')
+		summary = {}
 		start = time.time()
 		if args.db == 'DR1':
 			db = 'desdr'
@@ -225,11 +247,14 @@ def run(args):
 			db = 'dessci'
 		
 		logger.info('Selected Options:')
+		#sumlog.write('Selected Options: \n')
 		
 		# This puts any input type into a pandas dataframe
 		if args.csv:
 			userdf = pd.DataFrame(pd.read_csv(args.csv))
 			logger.info('    CSV: '+args.csv)
+			#sumlog.write('    CSV: ' + args.csv + '\n')
+			summary['csv'] = args.csv
 		elif args.ra:
 			coords = {}
 			coords['RA'] = args.ra
@@ -237,19 +262,38 @@ def run(args):
 			userdf = pd.DataFrame.from_dict(coords, orient='columns')
 			logger.info('    RA: '+str(args.ra))
 			logger.info('    DEC: '+str(args.dec))
+			#sumlog.write('    RA: '+str(args.ra)+'\n')
+			#sumlog.write('    DEC: '+str(args.dec)+'\n')
+			summary['ra'] = str(args.ra)
+			summary['dec'] = str(args.dec)
 		elif args.coadd:
 			coadds = {}
 			coadds['COADD_OBJECT_ID'] = args.coadd
 			userdf = pd.DataFrame.from_dict(coadds, orient='columns')
 			logger.info('    CoaddID: '+str(args.coadd))
+			#sumlog.write('    CoaddID: '+str(args.coadd)+'\n')
+			summary['coadd'] = str(args.coadd)
 		
 		logger.info('    X size: '+str(args.xsize))
 		logger.info('    Y size: '+str(args.ysize))
 		logger.info('    Make TIFFs? '+str(args.make_tiffs))
 		logger.info('    Make PNGs? '+str(args.make_pngs))
 		logger.info('    Make FITS? '+str(args.make_fits))
+		#sumlog.write('    X size: '+str(args.xsize)+'\n')
+		#sumlog.write('    Y size: '+str(args.ysize)+'\n')
+		#sumlog.write('    Make TIFFs? '+str(args.make_tiffs)+'\n')
+		#sumlog.write('    Make PNGs? '+str(args.make_pngs)+'\n')
+		#sumlog.write('    Make FITS? '+str(args.make_fits)+'\n')
+		summary['xsize'] = str(args.xsize)
+		summary['ysize'] = str(args.ysize)
+		summary['make_tiffs'] = str(args.make_tiffs)
+		summary['make_pngs'] = str(args.make_pngs)
+		summary['make_fits'] = str(args.make_fits)
 		if args.make_fits:
 			logger.info('        Bands: '+args.colors)
+			#sumlog.write('        Bands: '+args.colors)+'\n'
+			summary['bands'] = args.colors
+		summary['db'] = args.db
 		
 		df = pd.DataFrame()
 		unmatched_coords = {'RA':[], 'DEC':[]}
@@ -261,10 +305,14 @@ def run(args):
 		
 		usernm = str(conn.user)
 		jobid = str(uuid.uuid4())
-		#outdir = usernm + '/' + jobid + '/'
 		outdir = OUTDIR + usernm + '/' + jobid + '/'
-		tablename = 'BTL_'+jobid.upper().replace("-","_")	# "BulkThumbs_List_<jobid>"
 		
+		logger.info('User: ' + usernm)
+		logger.info('JobID: ' + str(jobid))
+		summary['user'] = usernm
+		summary['jobid'] = str(jobid)
+		
+		tablename = 'BTL_'+jobid.upper().replace("-","_")	# "BulkThumbs_List_<jobid>"
 		if 'RA' in userdf:
 			if args.db == 'Y3A2':
 				ra_adjust = [360-userdf['RA'][i] if userdf['RA'][i]>180 else userdf['RA'][i] for i in range(len(userdf['RA']))]
@@ -272,12 +320,11 @@ def run(args):
 				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
 				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
 				
-				#query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from Y3A2_COADDTILE_GEOM m, {} temp where (m.CROSSRA0='N' and (temp.RA between m.RACMIN and m.RACMAX) and (temp.DEC between m.DECCMIN and m.DECCMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.RACMIN-360 and m.RACMAX) and (temp.DEC between m.DECCMIN and m.DECCMAX))".format(tablename)
 				query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
 				
 				df = conn.query_to_pandas(query)
 				curs.execute('drop table {}'.format(tablename))
-				os.remove(OUTDIR+tablename+'.csv')
+				#os.remove(OUTDIR+tablename+'.csv')
 				
 				df = df.replace('-9999',np.nan)
 				dftemp = df[df.isnull().any(axis=1)]
@@ -301,6 +348,7 @@ def run(args):
 					else:	
 						df = df.append(f)
 			logger.info('Unmatched coordinates: \n{0}\n{1}'.format(unmatched_coords['RA'], unmatched_coords['DEC']))
+			summary['Unmatched_Coords'] = unmatched_coords
 			print(unmatched_coords)
 		
 		if 'COADD_OBJECT_ID' in userdf:
@@ -329,18 +377,18 @@ def run(args):
 					else:
 						df = df.append(f)
 			logger.info('Unmatched coadd ID\'s: \n{}'.format(unmatched_coadds))
+			summary['Unmatched_Coadds'] = unmatched_coadds
 			print(unmatched_coadds)
 		
 		conn.close()
 		df = df.sort_values(by=['TILENAME'])
 		df = np.array_split(df, nprocs)
 		
-		end = time.time()
-		print('Querying took (s): ' + str(end-start))
-		logger.info('Querying took (s): ' + str(end-start))
-		if db == 'desdr':
-			logger.info('For coords input and DR1 db, \nUnmatched Coords: ' + str(unmatched_coords))
-			logger.info('Unmatched Coadds: ' + str(unmatched_coadds))
+		end1 = time.time()
+		query_elapsed = '{0:.2f}'.format(end1-start)
+		print('Querying took (s): ' + query_elapsed)
+		logger.info('Querying took (s): ' + query_elapsed)
+		summary['query_time'] = query_elapsed
 	
 	else:
 		df = None
@@ -348,8 +396,6 @@ def run(args):
 	usernm, jobid, outdir = comm.bcast([usernm, jobid, outdir], root=0)
 	#outdir = usernm + '/' + jobid + '/'
 	df = comm.scatter(df, root=0)
-	
-	logger.info('JobID: ' + str(jobid))
 	
 	tilenm = df['TILENAME'].unique()
 	for i in tilenm:
@@ -370,9 +416,14 @@ def run(args):
 	comm.Barrier()
 	
 	if rank == 0:
-		pt1 = time.time()
-		dirsize = getPathSize(outdir)
+		end2 = time.time()
+		processing_time = '{0:.2f}'.format(end2-end1)
+		print('Processing took (s): ' + processing_time)
+		logger.info('Processing took (s): ' + processing_time)
+		summary['processing_time'] = processing_time
 		
+		#pt1 = time.time()
+		dirsize = getPathSize(outdir)
 		dirsize = dirsize * 1. / 1024
 		if dirsize > 1024. * 1024:
 			dirsize = '{0:.2f} GB'.format(1. * dirsize / 1024. / 1024)
@@ -383,8 +434,26 @@ def run(args):
 		
 		logger.info('All processes finished.')
 		logger.info('Total file size on disk: {}'.format(dirsize))
-		pt2 = time.time()
-		print('{} seconds'.format(pt2 - pt1))
+		summary['size_on_disk'] = str(dirsize)
+		#pt2 = time.time()
+		#print('{} seconds'.format(pt2 - pt1))
+		
+		pt3 = time.time()
+		files = glob.glob(outdir + '*/*')
+		logger.info('Total number of files: {}'.format(len(files)))
+		summary['number_of_files'] = len(files)
+		files = [i.split('/')[-2:] for i in files]
+		files = [('/').join(i) for i in files]
+		files = [i.split('.')[-2] for i in files]
+		files = [i.split('_')[0] for i in files]
+		files = list(set(files))
+		summary['files'] = files
+		pt4 = time.time()
+		print('File adjusting time: '.format(pt4-pt3))
+		
+		jsonfile = OUTDIR + 'BulkThumbs_'+logtime+'_SUMMARY.json'
+		with open(jsonfile, 'w') as fp:
+			json.dump(summary, fp)
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description="This program will make any number of cutouts, using the master tiles.")
@@ -412,7 +481,6 @@ if __name__ == '__main__':
 	
 	args = parser.parse_args()
 	
-	
 	if not args.csv and not (args.ra and args.dec) and not args.coadd:
 		print('Please include either RA/DEC coordinates or Coadd IDs.')
 		sys.exit(1)
@@ -425,5 +493,10 @@ if __name__ == '__main__':
 	if not args.make_tiffs and not args.make_pngs and not args.make_fits:
 		print('Nothing to do. Please select either/both make_tiff and make_fits.')
 		sys.exit(1)
+	
+	with open('config/bulkthumbsconfig.yaml','r') as cfile:
+		conf = yaml.load(cfile)
+	TILES_FOLDER = conf['directories']['tiles'] + '/'
+	OUTDIR = conf['directories']['outdir'] + '/'
 	
 	run(args)
