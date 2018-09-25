@@ -6,12 +6,12 @@ Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_135518_c
 	135,518 objects across 12 tiles, 135,518 files created totalling 17.4 GiB
 	6 cores: (ncsa) 6m40s, query 2.89s
 
-Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_133368_coords.csv --make_pngs --xsize 1 --ysize 1
-	133,368 objects across 12 tiles, ? files created totalling ? GiB
+Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_129412_coords.csv --make_pngs --xsize 1 --ysize 1
+	129,412 objects across 12 tiles, 129401 files created totalling 16.6 GiB
 	6 cores: (ncsa) 
 
 Options: time mpirun -n 6 python bulkthumbs_7.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --make_fits --colors g,r,i,z,y --xsize 1 --ysize 1
-	6 cores: 
+	6 cores: 18m52.6s, query 716.1s
 """
 
 import os, sys
