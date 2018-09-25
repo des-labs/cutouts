@@ -496,7 +496,7 @@ if __name__ == '__main__':
 	
 	with open('config/bulkthumbsconfig.yaml','r') as cfile:
 		conf = yaml.load(cfile)
-	TILES_FOLDER = os.path.join(conf['directories']['tiles'], '/')
-	OUTDIR = os.path.join(conf['directories']['outdir'], '/')
+	TILES_FOLDER = conf['directories']['tiles'] + '/'
+	OUTDIR = conf['directories']['outdir'] + '/'
 	
 	run(args)
