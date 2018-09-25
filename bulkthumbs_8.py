@@ -68,18 +68,11 @@ class MPILogHandler(logging.FileHandler):
 
 def getPathSize(path):
 	dirsize = 0
-	"""
-	for path, dirs, files in os.walk(path):
-		for f in files:
-			fpath = os.path.join(path, f)
-			dirsize += os.path.getsize(fpath)
-	"""
 	for entry in os.scandir(path):
 		if entry.is_dir(follow_symlinks=False):
 			dirsize += getPathSize(entry.path)
 		else:
 			dirsize += os.path.getsize(entry)
-	
 	return dirsize
 
 def _DecConverter(ra, dec):
@@ -148,13 +141,14 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 		lower = min(im.size[1] - pixcoords[1][i] + dy, 10000)
 		newimg = im.crop((left, upper, right, lower))
 		
-		if newimg.size != (2*dx, 2*dy):
-			logger.info('MakeTiffCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(filenm.split('/')[-1]))
-		
 		if maketiff:
-			newimg.save(filenm+'.tiff', format='TIFF')
+			filenm += '.tiff'
+			newimg.save(filenm, format='TIFF')
 		if makepngs:
-			newimg.save(filenm+'.png', format='PNG')
+			filenm += '.png'
+			newimg.save(filenm, format='PNG')
+		if newimg.size != (2*dx, 2*dy):
+			logger.info('MakeTiffCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(('/').join(filenm.split('/')[-2:])))
 	logger.info('MakeTiffCut - Tile {} complete.'.format(df['TILENAME'][0]))
 
 def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
@@ -217,7 +211,7 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 				dx = int(size[1] * ARCMIN_TO_DEG / pixelscale[0] / u.arcmin)		# pixelscale is in degrees (CUNIT)
 				dy = int(size[0] * ARCMIN_TO_DEG / pixelscale[1] / u.arcmin)
 				if (newhdul[0].header['NAXIS1'], newhdul[0].header['NAXIS2']) != (dx, dy):
-					logger.info('MakeFitsCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(filenm.split('/')[-1]))
+					logger.info('MakeFitsCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(('/').join(filenm.split('/')[-2:])))
 			
 			newhdul.writeto(filenm, output_verify='exception', overwrite=True, checksum=False)
 			newhdul.close()
@@ -446,7 +440,7 @@ def run(args):
 		
 		pt3 = time.time()
 		files = glob.glob(outdir + '*/*')
-		logger.info('Total number of files: '.format(len(files)))
+		logger.info('Total number of files: {}'.format(len(files)))
 		summary['number_of_files'] = len(files)
 		files = [i.split('/')[-2:] for i in files]
 		files = [('/').join(i) for i in files]
