@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 import uuid
 import json
+import yaml
 from astropy import units as u
 from astropy.io import fits
 from astropy.nddata import Cutout2D
@@ -34,8 +35,8 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = 144000000		# allows Pillow to not freak out at a large filesize
 ARCMIN_TO_DEG = 0.0166667		# deg per arcmin
 
-TILES_FOLDER = 'tiles/'
-OUTDIR = 'output/'
+TILES_FOLDER = '' #'tiles/'
+OUTDIR = '' #'output/'
 
 comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
@@ -486,7 +487,6 @@ if __name__ == '__main__':
 	
 	args = parser.parse_args()
 	
-	
 	if not args.csv and not (args.ra and args.dec) and not args.coadd:
 		print('Please include either RA/DEC coordinates or Coadd IDs.')
 		sys.exit(1)
@@ -499,5 +499,10 @@ if __name__ == '__main__':
 	if not args.make_tiffs and not args.make_pngs and not args.make_fits:
 		print('Nothing to do. Please select either/both make_tiff and make_fits.')
 		sys.exit(1)
+	
+	with open('config/bulkthumbsconfig.yaml','r') as cfile:
+		conf = yaml.load(cfile)
+	TILES_FOLDER = conf['directories']['tiles'] + '/'
+	OUTDIR = conf['directories']['outdir'] + '/'
 	
 	run(args)
