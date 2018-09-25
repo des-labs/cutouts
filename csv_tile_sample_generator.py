@@ -4,7 +4,7 @@ import easyaccess as ea
 import pandas as pd
 import random
 
-m = 10000
+m = 20000
 total = 0
 r = random.randint(1, m)
 total += r
@@ -45,40 +45,40 @@ query12 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m wh
 
 """
 total = 0
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query1 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0120-2706\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query2 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0133-4914\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query3 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0148-1707\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query4 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0202-3749\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query5 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0210-1624\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query6 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0227-0958\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query7 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0232-3206\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query8 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0308-1958\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query9 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0311-3749\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query10 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES0435-2623\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query11 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES2147-5540\') where rownum<{};'.format(r)
-r = random.randint(1, 20000)
+r = random.randint(1, m)
 total += r
 query12 = 'select * from (select COADD_OBJECT_ID from DR1_MAIN where TILENAME=\'DES2246-4914\') where rownum<{};'.format(r)
 """
