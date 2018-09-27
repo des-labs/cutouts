@@ -386,17 +386,11 @@ def run(args):
 				curs.execute('drop table {}'.format(tablename))
 				os.remove(OUTDIR+tablename+'.csv')
 				
-				print(df.head(10))
-				print(len(df))
-				
 				df = df.replace('-9999',np.nan)
 				df = df.replace(-9999.000000,np.nan)
 				dftemp = df[df.isnull().any(axis=1)]
 				unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
 				df = df.dropna(axis=0, how='any')
-				
-				print(df.head(10))
-				print(len(df))
 			
 			if args.db == 'DR1':
 				for i in range(len(userdf)):
