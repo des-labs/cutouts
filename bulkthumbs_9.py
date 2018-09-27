@@ -133,8 +133,8 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 		if 'COADD_OBJECT_ID' in df:
 			filenm = outdir + str(df['COADD_OBJECT_ID'][i])
 		else:
-			filenm = outdir + 'x{0}y{1}'.format(df['RA'][i], df['DEC'][i])
-			#filenm = outdir + 'DESJ' + _DecConverter(df['RA'][0], df['DEC'][0])
+			#filenm = outdir + 'x{0}y{1}'.format(df['RA'][i], df['DEC'][i])
+			filenm = outdir + 'DESJ' + _DecConverter(df['RA'][0], df['DEC'][0])
 		
 		if 'XSIZE' in df and not np.isnan(df['XSIZE'][i]):
 			udx = int(0.5 * df['XSIZE'][i] * ARCMIN_TO_DEG / pixelscale[0])
@@ -182,8 +182,8 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 			if 'COADD_OBJECT_ID' in df:
 				filenm = outdir + '{0}_{1}.fits'.format(df['COADD_OBJECT_ID'][p], colors[c].lower())
 			else:
-				filenm = outdir + 'x{0}y{1}_{2}.fits'.format(df['RA'][p], df['DEC'][p], colors[c].lower())
-				#filenm = outdir + 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p]) + '_{}.fits'.format(colors[c].lower())
+				#filenm = outdir + 'x{0}y{1}_{2}.fits'.format(df['RA'][p], df['DEC'][p], colors[c].lower())
+				filenm = outdir + 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p]) + '_{}.fits'.format(colors[c].lower())
 			
 			newhdul = fits.HDUList()
 			pixelscale = None
@@ -344,9 +344,11 @@ def run(args):
 				os.remove(OUTDIR+tablename+'.csv')
 				
 				df = df.replace('-9999',np.nan)
+				df = df.replace(-9999.000000,np.nan)
 				dftemp = df[df.isnull().any(axis=1)]
 				unmatched_coords['RA'] = dftemp['RA'].tolist()
 				unmatched_coords['DEC'] = dftemp['DEC'].tolist()
+				df = df.dropna(axis=0, how='any')
 			
 			if args.db == 'DR1':
 				for i in range(len(userdf)):
@@ -384,10 +386,17 @@ def run(args):
 				curs.execute('drop table {}'.format(tablename))
 				os.remove(OUTDIR+tablename+'.csv')
 				
+				print(df.head(10))
+				print(len(df))
+				
 				df = df.replace('-9999',np.nan)
 				df = df.replace(-9999.000000,np.nan)
 				dftemp = df[df.isnull().any(axis=1)]
 				unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
+				df = df.dropna(axis=0, how='any')
+				
+				print(df.head(10))
+				print(len(df))
 			
 			if args.db == 'DR1':
 				for i in range(len(userdf)):
@@ -442,7 +451,6 @@ def run(args):
 		logger.info('Processing took (s): ' + processing_time)
 		summary['processing_time'] = processing_time
 		
-		#pt1 = time.time()
 		dirsize = getPathSize(outdir)
 		dirsize = dirsize * 1. / 1024
 		if dirsize > 1024. * 1024:
@@ -455,8 +463,6 @@ def run(args):
 		logger.info('All processes finished.')
 		logger.info('Total file size on disk: {}'.format(dirsize))
 		summary['size_on_disk'] = str(dirsize)
-		#pt2 = time.time()
-		#print('{} seconds'.format(pt2 - pt1))
 		
 		files = glob.glob(outdir + '*/*')
 		logger.info('Total number of files: {}'.format(len(files)))
