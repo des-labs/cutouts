@@ -2,10 +2,10 @@
 
 """
 TESTS:
-Options: time mpirun -n 6 python bulkthumbs_8.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
+Options: time mpirun -n 6 python bulkthumbs_9.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
 	6 cores: (ncsa) 
 
-Options: time mpirun -n 6 python bulkthumbs_8.py --csv des_tiles_sample_129412_coords.csv --make_pngs --xsize 1 --ysize 1
+Options: time mpirun -n 6 python bulkthumbs_9.py --csv des_tiles_sample_129412_coords.csv --make_pngs --xsize 1 --ysize 1
 	6 cores: (ncsa) 
 """
 
@@ -35,8 +35,8 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = 144000000		# allows Pillow to not freak out at a large filesize
 ARCMIN_TO_DEG = 0.0166667		# deg per arcmin
 
-TILES_FOLDER = '' #'tiles/'
-OUTDIR = '' #'output/'
+TILES_FOLDER = ''
+OUTDIR = ''
 
 comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
@@ -133,12 +133,22 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 		if 'COADD_OBJECT_ID' in df:
 			filenm = outdir + str(df['COADD_OBJECT_ID'][i])
 		else:
-			filenm = outdir + 'x{0}y{1}'.format(df['RA'][i], df['DEC'][i])
-			#filenm = outdir + 'DESJ' + _DecConverter(df['RA'][0], df['DEC'][0])
-		left = max(0, pixcoords[0][i] - dx)
-		upper = max(0, im.size[1] - pixcoords[1][i] - dy)
-		right = min(pixcoords[0][i] + dx, 10000)
-		lower = min(im.size[1] - pixcoords[1][i] + dy, 10000)
+			#filenm = outdir + 'x{0}y{1}'.format(df['RA'][i], df['DEC'][i])
+			filenm = outdir + 'DESJ' + _DecConverter(df['RA'][0], df['DEC'][0])
+		
+		if 'XSIZE' in df and not np.isnan(df['XSIZE'][i]):
+			udx = int(0.5 * df['XSIZE'][i] * ARCMIN_TO_DEG / pixelscale[0])
+		else:
+			udx = dx
+		if 'YSIZE' in df and not np.isnan(df['YSIZE'][i]):
+			udy = int(0.5 * df['YSIZE'][i] * ARCMIN_TO_DEG / pixelscale[0])
+		else:
+			udy = dy
+		
+		left = max(0, pixcoords[0][i] - udx)
+		upper = max(0, im.size[1] - pixcoords[1][i] - udy)
+		right = min(pixcoords[0][i] + udx, 10000)
+		lower = min(im.size[1] - pixcoords[1][i] + udy, 10000)
 		newimg = im.crop((left, upper, right, lower))
 		
 		if maketiff:
@@ -147,7 +157,7 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 		if makepngs:
 			filenm += '.png'
 			newimg.save(filenm, format='PNG')
-		if newimg.size != (2*dx, 2*dy):
+		if newimg.size != (2*udx, 2*udy):
 			logger.info('MakeTiffCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(('/').join(filenm.split('/')[-2:])))
 	logger.info('MakeTiffCut - Tile {} complete.'.format(df['TILENAME'][0]))
 
@@ -172,11 +182,24 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 			if 'COADD_OBJECT_ID' in df:
 				filenm = outdir + '{0}_{1}.fits'.format(df['COADD_OBJECT_ID'][p], colors[c].lower())
 			else:
-				filenm = outdir + 'x{0}y{1}_{2}.fits'.format(df['RA'][p], df['DEC'][p], colors[c].lower())
-				#filenm = outdir + 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p]) + '_{}.fits'.format(colors[c].lower())
+				#filenm = outdir + 'x{0}y{1}_{2}.fits'.format(df['RA'][p], df['DEC'][p], colors[c].lower())
+				filenm = outdir + 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p]) + '_{}.fits'.format(colors[c].lower())
 			
 			newhdul = fits.HDUList()
 			pixelscale = None
+			
+			if 'XSIZE' in df or 'YSIZE' in df:
+				if 'XSIZE' in df and not np.isnan(df['XSIZE'][p]):
+					uxsize = df['XSIZE'][p] * u.arcmin
+				else:
+					uxsize = size[1]
+				if 'YSIZE' in df and not np.isnan(df['YSIZE'][p]):
+					uysize = df['YSIZE'][p] * u.arcmin
+				else:
+					uysize = size[0]
+				usize = u.Quantity((uysize, uxsize))
+			else:
+				usize = size
 			
 			# Iterate over all HDUs in the tile
 			for i in range(len(hdul)):
@@ -188,7 +211,7 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 				header = h.copy()
 				w=WCS(header)
 				
-				cutout = Cutout2D(data, positions[p], size, wcs=w, mode='trim')
+				cutout = Cutout2D(data, positions[p], usize, wcs=w, mode='trim')
 				crpix1, crpix2 = cutout.position_cutout
 				x, y = cutout.position_original
 				crval1, crval2 = w.wcs_pix2world(x, y, 1)
@@ -208,8 +231,8 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 				newhdul.append(newhdu)
 			
 			if pixelscale is not None:
-				dx = int(size[1] * ARCMIN_TO_DEG / pixelscale[0] / u.arcmin)		# pixelscale is in degrees (CUNIT)
-				dy = int(size[0] * ARCMIN_TO_DEG / pixelscale[1] / u.arcmin)
+				dx = int(usize[1] * ARCMIN_TO_DEG / pixelscale[0] / u.arcmin)		# pixelscale is in degrees (CUNIT)
+				dy = int(usize[0] * ARCMIN_TO_DEG / pixelscale[1] / u.arcmin)
 				if (newhdul[0].header['NAXIS1'], newhdul[0].header['NAXIS2']) != (dx, dy):
 					logger.info('MakeFitsCut - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(('/').join(filenm.split('/')[-2:])))
 			
@@ -238,7 +261,6 @@ def run(args):
 	outdir = ''
 	
 	if rank == 0:
-		#sumlog = open(OUTDIR + 'BulkThumbs_'+logtime+'_SUMMARY.log', 'w')
 		summary = {}
 		start = time.time()
 		if args.db == 'DR1':
@@ -247,13 +269,11 @@ def run(args):
 			db = 'dessci'
 		
 		logger.info('Selected Options:')
-		#sumlog.write('Selected Options: \n')
 		
 		# This puts any input type into a pandas dataframe
 		if args.csv:
 			userdf = pd.DataFrame(pd.read_csv(args.csv))
 			logger.info('    CSV: '+args.csv)
-			#sumlog.write('    CSV: ' + args.csv + '\n')
 			summary['csv'] = args.csv
 		elif args.ra:
 			coords = {}
@@ -262,8 +282,6 @@ def run(args):
 			userdf = pd.DataFrame.from_dict(coords, orient='columns')
 			logger.info('    RA: '+str(args.ra))
 			logger.info('    DEC: '+str(args.dec))
-			#sumlog.write('    RA: '+str(args.ra)+'\n')
-			#sumlog.write('    DEC: '+str(args.dec)+'\n')
 			summary['ra'] = str(args.ra)
 			summary['dec'] = str(args.dec)
 		elif args.coadd:
@@ -271,7 +289,6 @@ def run(args):
 			coadds['COADD_OBJECT_ID'] = args.coadd
 			userdf = pd.DataFrame.from_dict(coadds, orient='columns')
 			logger.info('    CoaddID: '+str(args.coadd))
-			#sumlog.write('    CoaddID: '+str(args.coadd)+'\n')
 			summary['coadd'] = str(args.coadd)
 		
 		logger.info('    X size: '+str(args.xsize))
@@ -279,11 +296,6 @@ def run(args):
 		logger.info('    Make TIFFs? '+str(args.make_tiffs))
 		logger.info('    Make PNGs? '+str(args.make_pngs))
 		logger.info('    Make FITS? '+str(args.make_fits))
-		#sumlog.write('    X size: '+str(args.xsize)+'\n')
-		#sumlog.write('    Y size: '+str(args.ysize)+'\n')
-		#sumlog.write('    Make TIFFs? '+str(args.make_tiffs)+'\n')
-		#sumlog.write('    Make PNGs? '+str(args.make_pngs)+'\n')
-		#sumlog.write('    Make FITS? '+str(args.make_fits)+'\n')
 		summary['xsize'] = str(args.xsize)
 		summary['ysize'] = str(args.ysize)
 		summary['make_tiffs'] = str(args.make_tiffs)
@@ -291,7 +303,6 @@ def run(args):
 		summary['make_fits'] = str(args.make_fits)
 		if args.make_fits:
 			logger.info('        Bands: '+args.colors)
-			#sumlog.write('        Bands: '+args.colors)+'\n'
 			summary['bands'] = args.colors
 		summary['db'] = args.db
 		
@@ -320,16 +331,24 @@ def run(args):
 				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
 				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
 				
-				query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
+				#query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
+				query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME"
+				if 'XSIZE' in userdf:
+					query += ", temp.XSIZE"
+				if 'YSIZE' in userdf:
+					query += ", temp.YSIZE"
+				query += " from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
 				
 				df = conn.query_to_pandas(query)
 				curs.execute('drop table {}'.format(tablename))
-				#os.remove(OUTDIR+tablename+'.csv')
+				os.remove(OUTDIR+tablename+'.csv')
 				
 				df = df.replace('-9999',np.nan)
+				df = df.replace(-9999.000000,np.nan)
 				dftemp = df[df.isnull().any(axis=1)]
 				unmatched_coords['RA'] = dftemp['RA'].tolist()
 				unmatched_coords['DEC'] = dftemp['DEC'].tolist()
+				df = df.dropna(axis=0, how='any')
 			
 			if args.db == 'DR1':
 				for i in range(len(userdf)):
@@ -337,9 +356,8 @@ def run(args):
 					ra180 = ra
 					if ra > 180:
 						ra180 = 360 - ra
-					
-					if args.db == 'DR1':
-						query = "select * from (select TILENAME from DR1_TILE_INFO where (CROSSRA0='N' and ({0} between RACMIN and RACMAX) and ({1} between DECCMIN and DECCMAX)) or (CROSSRA0='Y' and ({2} between RACMIN-360 and RACMAX) and ({1} between DECCMIN and DECCMAX))) where rownum=1".format(ra, userdf['DEC'][i], ra180)
+						
+					query = "select * from (select TILENAME from DR1_TILE_INFO where (CROSSRA0='N' and ({0} between RACMIN and RACMAX) and ({1} between DECCMIN and DECCMAX)) or (CROSSRA0='Y' and ({2} between RACMIN-360 and RACMAX) and ({1} between DECCMIN and DECCMAX))) where rownum=1".format(ra, userdf['DEC'][i], ra180)
 					
 					f = conn.query_to_pandas(query)
 					if f.empty:
@@ -356,7 +374,13 @@ def run(args):
 				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
 				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
 				
-				query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
+				#query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
+				query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME"
+				if 'XSIZE' in userdf:
+					query += ", temp.XSIZE"
+				if 'YSIZE' in userdf:
+					query += ", temp.YSIZE"
+				query += " from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
 				
 				df = conn.query_to_pandas(query)
 				curs.execute('drop table {}'.format(tablename))
@@ -366,6 +390,7 @@ def run(args):
 				df = df.replace(-9999.000000,np.nan)
 				dftemp = df[df.isnull().any(axis=1)]
 				unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
+				df = df.dropna(axis=0, how='any')
 			
 			if args.db == 'DR1':
 				for i in range(len(userdf)):
@@ -394,13 +419,11 @@ def run(args):
 		df = None
 	
 	usernm, jobid, outdir = comm.bcast([usernm, jobid, outdir], root=0)
-	#outdir = usernm + '/' + jobid + '/'
 	df = comm.scatter(df, root=0)
 	
 	tilenm = df['TILENAME'].unique()
 	for i in tilenm:
 		tiledir = TILES_FOLDER + i + '/'
-		#tiledir = 'DES0210-1624/'
 		udf = df[ df.TILENAME == i ]
 		udf = udf.reset_index()
 		
@@ -422,7 +445,6 @@ def run(args):
 		logger.info('Processing took (s): ' + processing_time)
 		summary['processing_time'] = processing_time
 		
-		#pt1 = time.time()
 		dirsize = getPathSize(outdir)
 		dirsize = dirsize * 1. / 1024
 		if dirsize > 1024. * 1024:
@@ -435,10 +457,7 @@ def run(args):
 		logger.info('All processes finished.')
 		logger.info('Total file size on disk: {}'.format(dirsize))
 		summary['size_on_disk'] = str(dirsize)
-		#pt2 = time.time()
-		#print('{} seconds'.format(pt2 - pt1))
 		
-		pt3 = time.time()
 		files = glob.glob(outdir + '*/*')
 		logger.info('Total number of files: {}'.format(len(files)))
 		summary['number_of_files'] = len(files)
@@ -448,8 +467,6 @@ def run(args):
 		files = [i.split('_')[0] for i in files]
 		files = list(set(files))
 		summary['files'] = files
-		pt4 = time.time()
-		print('File adjusting time: '.format(pt4-pt3))
 		
 		jsonfile = OUTDIR + 'BulkThumbs_'+logtime+'_SUMMARY.json'
 		with open(jsonfile, 'w') as fp:
