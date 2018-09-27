@@ -1,22 +1,24 @@
 # cutouts
 
-Current working version: bulkthumbs_7.py
+Current working version: bulkthumbs_9.py
 
-Current development version: #8
+Current development version: #9
 
 ## Requirements (also in requirments.txt in master branch):
 ```
 astropy == 3.0.3
 easyaccess == 1.4.3
+json
 mpi4py == 2.0.0
 mpich2 == 1.4.1p1 (should be included when getting mpi4py)
 numpy == 1.13.3
 pandas == 0.21.0 (should work with up-to-date 0.23.4)
 pillow == 5.2.0 (this is the fork of PIL, *not* PIL itself)
+yaml
 ```
 ## Options when running (from the built-in help):
 ```
-usage: bulkthumbs_7.py [-h] [--csv CSV] [--ra [RA [RA ...]]]
+usage: bulkthumbs_9.py [-h] [--csv CSV] [--ra [RA [RA ...]]]
                        [--dec [DEC [DEC ...]]] [--coadd [COADD [COADD ...]]]
                        [--make_tiffs] [--make_fits] [--make_pngs]
                        [--xsize XSIZE] [--ysize YSIZE] [--colors COLORS]
@@ -43,7 +45,7 @@ optional arguments:
                         Y3A2.
 ```
 ### Example using a CSV:
-`mpirun -n 6 python bulkthumbs_7.py --csv <user/path/to/csv/file> --make_pngs --make_fits --xsize 3 --ysize 2 --colors r,Y --db Y3A2`
+`mpirun -n 6 python bulkthumbs_9.py --csv <user/path/to/csv/file> --make_pngs --make_fits --xsize 3 --ysize 2 --colors r,Y --db Y3A2`
 
 ### Example using a list of coordinates:
-`mpirun -n 6 python bulkthumbs_7.py --ra 4.9703 10.1415 --dec -48.9987 -62.0329 --make_pngs --make_fits --xsize 1 --ysize 1 --colors g,r,i,z,Y --db Y3A2`
+`mpirun -n 6 python bulkthumbs_9.py --ra 4.9703 10.1415 --dec -48.9987 -62.0329 --make_pngs --make_fits --xsize 1 --ysize 1 --colors g,r,i,z,Y --db Y3A2`
