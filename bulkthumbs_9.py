@@ -3,10 +3,10 @@
 """
 TESTS:
 Options: time mpirun -n 6 python bulkthumbs_9.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
-	6 cores: (ncsa) 
+	6 cores: (ncsa) 6m43s, query 37s, processing 361s, 17.4 GiB
 
-Options: time mpirun -n 6 python bulkthumbs_9.py --csv des_tiles_sample_129412_coords.csv --make_pngs --xsize 1 --ysize 1
-	6 cores: (ncsa) 
+Options: time mpirun -n 6 python bulkthumbs_9.py --csv des_tiles_sample_129411_coords.csv --make_pngs --xsize 1 --ysize 1
+	6 cores: (ncsa) 21m9sm query 746s, processing 515s, 
 """
 
 import os, sys
@@ -72,7 +72,13 @@ def getPathSize(path):
 		if entry.is_dir(follow_symlinks=False):
 			dirsize += getPathSize(entry.path)
 		else:
-			dirsize += os.path.getsize(entry)
+			#dirsize += os.path.getsize(entry)
+			
+			try:
+				dirsize += os.path.getsize(entry)
+			except FileNotFoundError:
+				continue
+			
 	return dirsize
 
 def _DecConverter(ra, dec):
@@ -80,15 +86,15 @@ def _DecConverter(ra, dec):
 	raHH = int(ra1)
 	raMM = int((ra1 - raHH) * 60)
 	raSS = (((ra1 - raHH) * 60) - raMM) * 60
-	raSS = np.round(raSS, decimals=1)
-	raOUT = '{0:02d}{1:02d}{2:04.1f}'.format(raHH, raMM, raSS) if ra > 0 else '-{0:02d}{1:02d}{2:04.1f}'.format(raHH, raMM, raSS)
+	raSS = np.round(raSS, decimals=4)
+	raOUT = '{0:02d}{1:02d}{2:02.4f}'.format(raHH, raMM, raSS) if ra > 0 else '-{0:02d}{1:02d}{2:02.4f}'.format(raHH, raMM, raSS)
 	
 	dec1 = np.abs(dec)
 	decDD = int(dec1)
 	decMM = int((dec1 - decDD) * 60)
 	decSS = (((dec1 - decDD) * 60) - decMM) * 60
-	decSS = np.round(decSS, decimals=1)
-	decOUT = '-{0:02d}{1:02d}{2:04.1f}'.format(decDD, decMM, decSS) if dec < 0 else '+{0:02d}{1:02d}{2:04.1f}'.format(decDD, decMM, decSS)
+	decSS = np.round(decSS, decimals=4)
+	decOUT = '-{0:02d}{1:02d}{2:02.4f}'.format(decDD, decMM, decSS) if dec < 0 else '+{0:02d}{1:02d}{2:02.4f}'.format(decDD, decMM, decSS)
 	
 	return raOUT + decOUT
 
@@ -134,7 +140,7 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 			filenm = outdir + str(df['COADD_OBJECT_ID'][i])
 		else:
 			#filenm = outdir + 'x{0}y{1}'.format(df['RA'][i], df['DEC'][i])
-			filenm = outdir + 'DESJ' + _DecConverter(df['RA'][0], df['DEC'][0])
+			filenm = outdir + 'DESJ' + _DecConverter(df['RA'][i], df['DEC'][i])
 		
 		if 'XSIZE' in df and not np.isnan(df['XSIZE'][i]):
 			udx = int(0.5 * df['XSIZE'][i] * ARCMIN_TO_DEG / pixelscale[0])
@@ -241,8 +247,27 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 	logger.info('MakeFitsCut - Tile {} complete.'.format(df['TILENAME'][0]))
 
 def run(args):
+	if rank == 0:
+		if args.db == 'DR1':
+			db = 'desdr'
+		elif args.db == 'Y3A2':
+			db = 'dessci'
+		
+		conn = ea.connect(db)
+		curs = conn.cursor()
+		
+		usernm = str(conn.user)
+		jobid = str(uuid.uuid4())
+		outdir = OUTDIR + usernm + '/' + jobid + '/'
+		os.makedirs(outdir, exist_ok=True)
+	else:
+		usernm, jobid, outdir = None, None, None
+	
+	usernm, jobid, outdir = comm.bcast([usernm, jobid, outdir], root=0)
+	
 	logtime = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-	logname = OUTDIR + 'BulkThumbs_' + logtime + '.log'
+	#logname = OUTDIR + 'BulkThumbs_' + logtime + '.log'
+	logname = outdir + 'BulkThumbs_' + logtime + '.log'
 	formatter = logging.Formatter('%(asctime)s - '+str(rank)+' - %(levelname)-8s - %(message)s')
 	
 	logger = logging.getLogger(__name__)
@@ -256,17 +281,17 @@ def run(args):
 	xs = float(args.xsize)
 	ys = float(args.ysize)
 	colors = args.colors.split(',')
-	usernm = ''
-	jobid = ''
-	outdir = ''
+	#usernm = ''
+	#jobid = ''
+	#outdir = ''
 	
 	if rank == 0:
 		summary = {}
 		start = time.time()
-		if args.db == 'DR1':
-			db = 'desdr'
-		elif args.db == 'Y3A2':
-			db = 'dessci'
+		#if args.db == 'DR1':
+		#	db = 'desdr'
+		#elif args.db == 'Y3A2':
+		#	db = 'dessci'
 		
 		logger.info('Selected Options:')
 		
@@ -310,13 +335,13 @@ def run(args):
 		unmatched_coords = {'RA':[], 'DEC':[]}
 		unmatched_coadds = []
 		
-		logger.info('Connecting to: '+db)
-		conn = ea.connect(db)
-		curs = conn.cursor()
+		#logger.info('Connecting to: '+db)
+		#conn = ea.connect(db)
+		#curs = conn.cursor()
 		
-		usernm = str(conn.user)
-		jobid = str(uuid.uuid4())
-		outdir = OUTDIR + usernm + '/' + jobid + '/'
+		#usernm = str(conn.user)
+		#jobid = str(uuid.uuid4())
+		#outdir = OUTDIR + usernm + '/' + jobid + '/'
 		
 		logger.info('User: ' + usernm)
 		logger.info('JobID: ' + str(jobid))
@@ -407,6 +432,12 @@ def run(args):
 		
 		conn.close()
 		df = df.sort_values(by=['TILENAME'])
+		df = df.drop_duplicates(['RA','DEC'], keep='first')
+		
+		if args.return_list:
+			os.makedirs(outdir, exist_ok=True)
+			df.to_csv(outdir+tablename+'.csv', index=False)
+		
 		df = np.array_split(df, nprocs)
 		
 		end1 = time.time()
@@ -418,7 +449,7 @@ def run(args):
 	else:
 		df = None
 	
-	usernm, jobid, outdir = comm.bcast([usernm, jobid, outdir], root=0)
+	#usernm, jobid, outdir = comm.bcast([usernm, jobid, outdir], root=0)
 	df = comm.scatter(df, root=0)
 	
 	tilenm = df['TILENAME'].unique()
@@ -463,12 +494,16 @@ def run(args):
 		summary['number_of_files'] = len(files)
 		files = [i.split('/')[-2:] for i in files]
 		files = [('/').join(i) for i in files]
-		files = [i.split('.')[-2] for i in files]
+		if 'COADD_OBJECT_ID' in userdf:
+			files = [i.split('.')[-2] for i in files]
+		else:
+			files = [('.').join(i.split('.')[-4:-1]) for i in files]
 		files = [i.split('_')[0] for i in files]
 		files = list(set(files))
 		summary['files'] = files
 		
-		jsonfile = OUTDIR + 'BulkThumbs_'+logtime+'_SUMMARY.json'
+		#jsonfile = OUTDIR + 'BulkThumbs_'+logtime+'_SUMMARY.json'
+		jsonfile = outdir + 'BulkThumbs_'+logtime+'_SUMMARY.json'
 		with open(jsonfile, 'w') as fp:
 			json.dump(summary, fp)
 
@@ -483,6 +518,7 @@ if __name__ == '__main__':
 	parser.add_argument('--make_tiffs', action='store_true', help='Creates a TIFF file of the cutout region.')
 	parser.add_argument('--make_fits', action='store_true', help='Creates FITS files in the desired bands of the cutout region.')
 	parser.add_argument('--make_pngs', action='store_true', help='Creates a PNG file of the cutout region.')
+	parser.add_argument('--return_list', action='store_true', help='Saves list of inputted objects and their matched tiles to user directory.')
 	
 	parser.add_argument('--xsize', default=1.0, help='Size in arcminutes of the cutout x-axis. Default: 1.0')
 	parser.add_argument('--ysize', default=1.0, help='Size in arcminutes of the cutout y-axis. Default: 1.0')
@@ -507,7 +543,7 @@ if __name__ == '__main__':
 	if (args.ra and not args.dec) or (args.dec and not args.ra):
 		print('Please include BOTH RA and DEC if not using Coadd IDs.')
 		sys.exit(1)
-	if not args.make_tiffs and not args.make_pngs and not args.make_fits:
+	if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.return_list:
 		print('Nothing to do. Please select either/both make_tiff and make_fits.')
 		sys.exit(1)
 	
