@@ -257,9 +257,21 @@ def run(args):
 		curs = conn.cursor()
 		
 		usernm = str(conn.user)
-		jobid = str(uuid.uuid4())
+		if args.jobid:
+			jobid = args.jobid
+		else:
+			jobid = str(uuid.uuid4())
+		
 		outdir = OUTDIR + usernm + '/' + jobid + '/'
-		os.makedirs(outdir, exist_ok=True)
+		
+		try:
+			os.makedirs(outdir, exist_ok=False)
+		except OSError as e:
+			print(e)
+			print('Specified jobid already exists in output directory. Aborting job.')
+			conn.close()
+			sys.stdout.flush()
+			comm.Abort()
 	else:
 		usernm, jobid, outdir = None, None, None
 	
@@ -525,6 +537,7 @@ if __name__ == '__main__':
 	parser.add_argument('--colors', default='I', type=str.upper, help='Color bands for the fits cutout. Default: i')
 	
 	parser.add_argument('--db', default='Y3A2', type=str.upper, required=False, help='Which database to use. Default: Y3A2 Options: DR1 (very slow), Y3A2 (much faster).')
+	parser.add_argument('--jobid', required=False, help='Option to manually specify a jobid for this job.')
 	#parser.add_argument('--usernm', required=False, help='Username for database; otherwise uses values from desservices file.')
 	#parser.add_argument('--passwd', required=False, help='Password for database; otherwise uses values from desservices file.')
 	
@@ -534,6 +547,14 @@ if __name__ == '__main__':
 	
 	args = parser.parse_args()
 	
+	with open('config/bulkthumbsconfig.yaml','r') as cfile:
+		conf = yaml.load(cfile)
+	TILES_FOLDER = conf['directories']['tiles'] + '/'
+	OUTDIR = conf['directories']['outdir'] + '/'
+	
+	#if args.jobid and os.path.exists(OUTDIR+args.jobid):
+	#	print('Specified jobid already exists in output directory.')
+	#	sys.exit(1)
 	if not args.csv and not (args.ra and args.dec) and not args.coadd:
 		print('Please include either RA/DEC coordinates or Coadd IDs.')
 		sys.exit(1)
@@ -546,10 +567,5 @@ if __name__ == '__main__':
 	if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.return_list:
 		print('Nothing to do. Please select either/both make_tiff and make_fits.')
 		sys.exit(1)
-	
-	with open('config/bulkthumbsconfig.yaml','r') as cfile:
-		conf = yaml.load(cfile)
-	TILES_FOLDER = conf['directories']['tiles'] + '/'
-	OUTDIR = conf['directories']['outdir'] + '/'
 	
 	run(args)
