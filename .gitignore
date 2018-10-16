@@ -1,5 +1,6 @@
 *.pyc
 docker/output/*
+galaxy_DES0120-2706_x20.2435_y-27.0297/
 *.csv
 *.log
 cutoutbulk.py
@@ -11,6 +12,8 @@ plotter_trial_3.py
 plotter_trial_4.py
 plotter_trial_5.py
 plotter_trial_6.py
+rgbmaker.py
+rgbmaker_2.py
 bulkthumbs_5_original.py
 lib_functions.py
 32x267546-16x720395_xs2ys3/
@@ -23,5 +26,6 @@ color_image_test/
 lgelman2/
 tiles/
 output/
+rgbmaker_test/
 multiprocessing_notes.txt
 overview.txt
