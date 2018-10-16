@@ -6,6 +6,11 @@ import random
 
 m = 20000
 total = 0
+
+df = pd.DataFrame(pd.read_csv('all_tiles.csv'))
+
+
+"""
 r = random.randint(1, m)
 total += r
 query1 = 'select * from (select t.RA, t.DEC from DR1_MAIN t, DR1_TILE_INFO m where t.TILENAME=m.TILENAME and (t.RA between m.URAMIN and m.URAMAX) and (t.DEC between m.UDECMIN and m.UDECMAX) and t.TILENAME=\'DES0120-2706\') where rownum<{};'.format(r)
