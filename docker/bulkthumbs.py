@@ -2,11 +2,11 @@
 
 """
 TESTS:
-Options: time mpirun -n 6 python bulkthumbs_9.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
-	6 cores: (ncsa) 6m43s, query 37s, processing 361s, 17.4 GiB
+Options: time mpirun -n 6 python bulkthumbs_11.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
+	6 cores: (ncsa) 
 
-Options: time mpirun -n 6 python bulkthumbs_9.py --csv des_tiles_sample_129411_coords.csv --make_pngs --xsize 1 --ysize 1
-	6 cores: (ncsa) 21m9sm query 746s, processing 515s, 
+Options: time mpirun -n 6 python bulkthumbs_11.py --csv des_tiles_sample_129411_coords.csv --make_pngs --xsize 1 --ysize 1
+	6 cores: (ncsa) 
 """
 
 import os, sys
@@ -18,6 +18,7 @@ import time
 import easyaccess as ea
 import numpy as np
 import pandas as pd
+import PIL
 import uuid
 import json
 import yaml
@@ -29,6 +30,7 @@ from astropy.nddata import utils as ndu
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 from astropy.wcs import utils
+from astropy.visualization import make_lupton_rgb as mlrgb
 from mpi4py import MPI as mpi
 from PIL import Image
 
@@ -97,6 +99,108 @@ def _DecConverter(ra, dec):
 	decOUT = '-{0:02d}{1:02d}{2:02.4f}'.format(decDD, decMM, decSS) if dec < 0 else '+{0:02d}{1:02d}{2:02.4f}'.format(decDD, decMM, decSS)
 	
 	return raOUT + decOUT
+
+
+
+
+def MakeRGB(df, p, xs, ys, r, g, b, w, bp, s, q):
+	pixelscale = utils.proj_plane_pixel_scales(w)
+	dx = int(0.5 * xs * ARCMIN_TO_DEG / pixelscale[0])		# pixelscale is in degrees (CUNIT)
+	dy = int(0.5 * ys * ARCMIN_TO_DEG / pixelscale[1])
+	
+	image = mlrgb(r, g, b, minimum=bp, stretch=s, Q=q)
+	
+	image = Image.fromarray(image, mode='RGB')
+	image = image.transpose(PIL.Image.FLIP_TOP_BOTTOM)
+	
+	if 'XSIZE' in df and not np.isnan(df['XSIZE'][p]):
+		udx = int(0.5 * df['XSIZE'][p] * ARCMIN_TO_DEG / pixelscale[0])
+	else:
+		udx = dx
+	if 'YSIZE' in df and not np.isnan(df['YSIZE'][p]):
+		udy = int(0.5 * df['YSIZE'][p] * ARCMIN_TO_DEG / pixelscale[0])
+	else:
+		udy = dy
+	
+	if image.size != (2*udx, 2*udy):
+		issmaller = True
+	else:
+		issmaller = False
+	
+	return image, issmaller
+
+def MakeLuptonRGB(tiledir, outdir, df, positions, xs, ys, colors, bp, s, q):
+	logger = logging.getLogger(__name__)
+	
+	for i in colors:
+		c = i.split(',')
+		
+		if not os.path.exists(outdir):	# Nothing has been created. No color bands exist.
+			# Call to MakeFitsCut with all colors
+			size = u.Quantity((ys, xs), u.arcmin)
+			MakeFitsCut(tiledir, outdir, size, positions, c, df)
+		else:		# Outdir exists, now check if the right color bands exist.
+			print('outdir exists')
+			c2 = []
+			if not glob.glob(outdir+'*_{}.fits'.format(c[0])):		# Color band doesn't exist
+				c2.append(c[0])			# append color to list to make
+			if not glob.glob(outdir+'*_{}.fits'.format(c[1])):		# Color band doesn't exist
+				c2.append(c[1])			# append color to list to make
+			if not glob.glob(outdir+'*_{}.fits'.format(c[2])):		# Color band doesn't exist
+				c2.append(c[2])			# append color to list to make
+			
+			if c2:		# Call to MakeFitsCut with necessary colors
+				logger.info('MakeLuptonRGB - Some required color band fits files are missing so we will call MakeFitsCut.')
+				size = u.Quantity((ys, xs), u.arcmin)
+				MakeFitsCut(tiledir, outdir, size, positions, c, df)
+		
+		for p in range(len(positions)):
+			if 'COADD_OBJECT_ID' in df:
+				nm = df['COADD_OBJECT_ID'][p]
+				filenm = outdir + '{0}_{1}{2}{3}.png'.format(nm, c[0], c[1], c[2])
+			else:
+				nm = 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p])
+				filenm = outdir + '{0}_{1}{2}{3}.png'.format(nm, c[0], c[1], c[2])
+			
+			try:
+				file_r = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[0]))
+			except IndexError:
+				print('No FITS file in {0} band found for object {1}. Will not creat RGB cutout.'.format(c[0], nm))
+				logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not creat RGB cutout.'.format(c[0], nm))
+				continue
+			else:
+				r, header = fits.getdata(file_r[0], 'SCI', header=True)
+				w = WCS(header)
+			try:
+				file_g = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[1]))
+			except IndexError:
+				print('No FITS file in {0} band found for object {1}. Will not creat RGB cutout.'.format(c[1], nm))
+				logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not creat RGB cutout.'.format(c[1], nm))
+				continue
+			else:
+				g = fits.getdata(file_g[0], 'SCI')
+			try:
+				file_b = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[2]))
+			except IndexError:
+				print('No FITS file in {0} band found for object {1}. Will not creat RGB cutout.'.format(c[2], nm))
+				logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not creat RGB cutout.'.format(c[2], nm))
+				continue
+			else:
+				b = fits.getdata(file_b[0], 'SCI')
+	
+			newimg, issmaller = MakeRGB(df, positions[p], xs, ys, r, g, b, w, bp, s, q)
+			newimg.save(filenm, format='PNG')
+			
+			if issmaller:
+				logger.info('MakeLuptonRGB - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(('/').join(filenm.split('/')[-2:])))	
+		
+		
+	logger.info('MakeLuptonRGB - Tile {} complete.'.format(df['TILENAME'][0]))
+
+
+
+
+
 
 def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 	logger = logging.getLogger(__name__)
@@ -171,7 +275,7 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 	logger = logging.getLogger(__name__)
 	os.makedirs(outdir, exist_ok=True)			# Check if outdir exists
 	
-	for c in range(len(colors)):		# Iterate over al desired colors
+	for c in range(len(colors)):		# Iterate over all desired colors
 		# Finish the tile's name and open the file. Camel-case check is required because Y band is always capitalized.
 		if colors[c] == 'Y':
 			tilename = glob.glob(tiledir + '*_{}.fits.fz'.format(colors[c]))
@@ -333,27 +437,24 @@ def run(args):
 		logger.info('    Make TIFFs? '+str(args.make_tiffs))
 		logger.info('    Make PNGs? '+str(args.make_pngs))
 		logger.info('    Make FITS? '+str(args.make_fits))
+		logger.info('    Make RGBs? {}'.format('True' if args.make_rgb else 'False'))
 		summary['xsize'] = str(args.xsize)
 		summary['ysize'] = str(args.ysize)
 		summary['make_tiffs'] = str(args.make_tiffs)
 		summary['make_pngs'] = str(args.make_pngs)
 		summary['make_fits'] = str(args.make_fits)
+		summary['make_rgb'] = 'True' if args.make_rgb else 'False'
 		if args.make_fits:
 			logger.info('        Bands: '+args.colors)
 			summary['bands'] = args.colors
+		if args.make_rgb:
+			logger.info('        Bands: '+str(args.make_rgb))
+			summary['rgb_colors'] = args.make_rgb
 		summary['db'] = args.db
 		
 		df = pd.DataFrame()
 		unmatched_coords = {'RA':[], 'DEC':[]}
 		unmatched_coadds = []
-		
-		#logger.info('Connecting to: '+db)
-		#conn = ea.connect(db)
-		#curs = conn.cursor()
-		
-		#usernm = str(conn.user)
-		#jobid = str(uuid.uuid4())
-		#outdir = OUTDIR + usernm + '/' + jobid + '/'
 		
 		logger.info('User: ' + usernm)
 		logger.info('JobID: ' + str(jobid))
@@ -461,7 +562,6 @@ def run(args):
 	else:
 		df = None
 	
-	#usernm, jobid, outdir = comm.bcast([usernm, jobid, outdir], root=0)
 	df = comm.scatter(df, root=0)
 	
 	tilenm = df['TILENAME'].unique()
@@ -478,6 +578,9 @@ def run(args):
 		
 		if args.make_fits:
 			MakeFitsCut(tiledir, outdir+i+'/', size, positions, colors, udf)
+		
+		if args.make_rgb:
+			MakeLuptonRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.make_rgb, args.rgb_minimum, args.rgb_stretch, args.rgb_asinh)
 	
 	comm.Barrier()
 	
@@ -514,7 +617,6 @@ def run(args):
 		files = list(set(files))
 		summary['files'] = files
 		
-		#jsonfile = OUTDIR + 'BulkThumbs_'+logtime+'_SUMMARY.json'
 		jsonfile = outdir + 'BulkThumbs_'+logtime+'_SUMMARY.json'
 		with open(jsonfile, 'w') as fp:
 			json.dump(summary, fp)
@@ -530,11 +632,16 @@ if __name__ == '__main__':
 	parser.add_argument('--make_tiffs', action='store_true', help='Creates a TIFF file of the cutout region.')
 	parser.add_argument('--make_fits', action='store_true', help='Creates FITS files in the desired bands of the cutout region.')
 	parser.add_argument('--make_pngs', action='store_true', help='Creates a PNG file of the cutout region.')
+	parser.add_argument('--make_rgb', action='append', type=str.lower, help='Creates 3-color images using the bands you select (reddest to bluest), e.g.: --make_rgb i,r,g --make_rgb z,i,r --make_rgb z,r,g')
 	parser.add_argument('--return_list', action='store_true', help='Saves list of inputted objects and their matched tiles to user directory.')
 	
 	parser.add_argument('--xsize', default=1.0, help='Size in arcminutes of the cutout x-axis. Default: 1.0')
 	parser.add_argument('--ysize', default=1.0, help='Size in arcminutes of the cutout y-axis. Default: 1.0')
 	parser.add_argument('--colors', default='I', type=str.upper, help='Color bands for the fits cutout. Default: i')
+
+	parser.add_argument('--rgb_minimum', default=1.0, help='The black point for the 3-color image. Default 1.0')
+	parser.add_argument('--rgb_stretch', default=50.0, help='The linear stretch of the image. Default 50.0.')
+	parser.add_argument('--rgb_asinh', default=10.0, help='The asinh softening parameter. Default 10.0')
 	
 	parser.add_argument('--db', default='Y3A2', type=str.upper, required=False, help='Which database to use. Default: Y3A2 Options: DR1 (very slow), Y3A2 (much faster).')
 	parser.add_argument('--jobid', required=False, help='Option to manually specify a jobid for this job.')
@@ -552,9 +659,6 @@ if __name__ == '__main__':
 	TILES_FOLDER = conf['directories']['tiles'] + '/'
 	OUTDIR = conf['directories']['outdir'] + '/'
 	
-	#if args.jobid and os.path.exists(OUTDIR+args.jobid):
-	#	print('Specified jobid already exists in output directory.')
-	#	sys.exit(1)
 	if not args.csv and not (args.ra and args.dec) and not args.coadd:
 		print('Please include either RA/DEC coordinates or Coadd IDs.')
 		sys.exit(1)
@@ -564,7 +668,7 @@ if __name__ == '__main__':
 	if (args.ra and not args.dec) or (args.dec and not args.ra):
 		print('Please include BOTH RA and DEC if not using Coadd IDs.')
 		sys.exit(1)
-	if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.return_list:
+	if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.make_rgb and not args.return_list:
 		print('Nothing to do. Please select either/both make_tiff and make_fits.')
 		sys.exit(1)
 	
