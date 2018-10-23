@@ -108,9 +108,8 @@ def MakeRGB(df, p, xs, ys, r, g, b, w, bp, s, q):
 	dx = int(0.5 * xs * ARCMIN_TO_DEG / pixelscale[0])		# pixelscale is in degrees (CUNIT)
 	dy = int(0.5 * ys * ARCMIN_TO_DEG / pixelscale[1])
 	
-	#pixcoord = utils.skycoord_to_pixel(p, w, origin=0, mode='wcs')
-	
 	image = mlrgb(r, g, b, minimum=bp, stretch=s, Q=q)
+	
 	image = Image.fromarray(image, mode='RGB')
 	image = image.transpose(PIL.Image.FLIP_TOP_BOTTOM)
 	
@@ -122,25 +121,12 @@ def MakeRGB(df, p, xs, ys, r, g, b, w, bp, s, q):
 		udy = int(0.5 * df['YSIZE'][p] * ARCMIN_TO_DEG / pixelscale[0])
 	else:
 		udy = dy
-	"""
-	left = max(0, pixcoord[0] - udx)
-	upper = max(0, image.size[1] - pixcoord[1] - udy)
-	right = min(pixcoord[0] + udx, 10000)
-	lower = min(image.size[1] - pixcoord[1] + udy, 10000)
-	newimg = image.crop((left, upper, right, lower))
-	
-	if newimg.size != (2*udx, 2*udy):
-		issmaller = True
-	else:
-		issmaller = False
-	"""
 	
 	if image.size != (2*udx, 2*udy):
 		issmaller = True
 	else:
 		issmaller = False
 	
-	#return newimg, issmaller
 	return image, issmaller
 
 def MakeLuptonRGB(tiledir, outdir, df, positions, xs, ys, colors, bp, s, q):
@@ -151,24 +137,20 @@ def MakeLuptonRGB(tiledir, outdir, df, positions, xs, ys, colors, bp, s, q):
 		
 		if not os.path.exists(outdir):	# Nothing has been created. No color bands exist.
 			# Call to MakeFitsCut with all colors
-			print('outdir does not exist')
 			size = u.Quantity((ys, xs), u.arcmin)
 			MakeFitsCut(tiledir, outdir, size, positions, c, df)
 		else:		# Outdir exists, now check if the right color bands exist.
 			print('outdir exists')
 			c2 = []
 			if not glob.glob(outdir+'*_{}.fits'.format(c[0])):		# Color band doesn't exist
-				# append color to list to make
-				c2.append(c[0])
+				c2.append(c[0])			# append color to list to make
 			if not glob.glob(outdir+'*_{}.fits'.format(c[1])):		# Color band doesn't exist
-				# append color to list to make
-				c2.append(c[1])
+				c2.append(c[1])			# append color to list to make
 			if not glob.glob(outdir+'*_{}.fits'.format(c[2])):		# Color band doesn't exist
-				# append color to list to make
-				c2.append(c[2])
-			# Call to MakeFitsCut with necessary colors
-			if c2:
-				print('gotta make these colors: ' + str(c2))
+				c2.append(c[2])			# append color to list to make
+			
+			if c2:		# Call to MakeFitsCut with necessary colors
+				logger.info('MakeLuptonRGB - Some required color band fits files are missing so we will call MakeFitsCut.')
 				size = u.Quantity((ys, xs), u.arcmin)
 				MakeFitsCut(tiledir, outdir, size, positions, c, df)
 		
@@ -196,7 +178,7 @@ def MakeLuptonRGB(tiledir, outdir, df, positions, xs, ys, colors, bp, s, q):
 				logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not creat RGB cutout.'.format(c[1], nm))
 				continue
 			else:
-				g = fits.getdata(file_r[0], 'SCI')
+				g = fits.getdata(file_g[0], 'SCI')
 			try:
 				file_b = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[2]))
 			except IndexError:
@@ -204,7 +186,7 @@ def MakeLuptonRGB(tiledir, outdir, df, positions, xs, ys, colors, bp, s, q):
 				logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not creat RGB cutout.'.format(c[2], nm))
 				continue
 			else:
-				b = fits.getdata(file_r[0], 'SCI')
+				b = fits.getdata(file_b[0], 'SCI')
 	
 			newimg, issmaller = MakeRGB(df, positions[p], xs, ys, r, g, b, w, bp, s, q)
 			newimg.save(filenm, format='PNG')
@@ -466,7 +448,7 @@ def run(args):
 			logger.info('        Bands: '+args.colors)
 			summary['bands'] = args.colors
 		if args.make_rgb:
-			logger.info('        Bands: '+args.make_rgb)
+			logger.info('        Bands: '+str(args.make_rgb))
 			summary['rgb_colors'] = args.make_rgb
 		summary['db'] = args.db
 		
