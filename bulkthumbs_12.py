@@ -70,8 +70,6 @@ def getPathSize(path):
 		if entry.is_dir(follow_symlinks=False):
 			dirsize += getPathSize(entry.path)
 		else:
-			#dirsize += os.path.getsize(entry)
-			
 			try:
 				dirsize += os.path.getsize(entry)
 			except FileNotFoundError:
@@ -388,17 +386,10 @@ def run(args):
 	xs = float(args.xsize)
 	ys = float(args.ysize)
 	colors = args.colors.split(',')
-	#usernm = ''
-	#jobid = ''
-	#outdir = ''
 	
 	if rank == 0:
 		summary = {}
 		start = time.time()
-		#if args.db == 'DR1':
-		#	db = 'desdr'
-		#elif args.db == 'Y3A2':
-		#	db = 'dessci'
 		
 		logger.info('Selected Options:')
 		
