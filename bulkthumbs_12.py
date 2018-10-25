@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+"""
+author: Landon Gelman, 2018
+description: command line tools for making large numbers and different kinds of cutouts from the Dark Energy Survey catalogs
+"""
+
 import os, sys
 import argparse
 import datetime
