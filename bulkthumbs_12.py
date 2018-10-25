@@ -454,72 +454,33 @@ def run(args):
 		
 		tablename = 'BTL_'+jobid.upper().replace("-","_")	# "BulkThumbs_List_<jobid>"
 		if 'RA' in userdf:
+			ra_adjust = [360-userdf['RA'][i] if userdf['RA'][i]>180 else userdf['RA'][i] for i in range(len(userdf['RA']))]
+			userdf = userdf.assign(RA_ADJUSTED = ra_adjust)
+			userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
+			conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
+			
+			#query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
+			query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME"
+			if 'XSIZE' in userdf:
+				query += ", temp.XSIZE"
+			if 'YSIZE' in userdf:
+				query += ", temp.YSIZE"
 			if args.db == 'Y3A2':
-				ra_adjust = [360-userdf['RA'][i] if userdf['RA'][i]>180 else userdf['RA'][i] for i in range(len(userdf['RA']))]
-				userdf = userdf.assign(RA_ADJUSTED = ra_adjust)
-				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
-				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
-				
-				#query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
-				query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME"
-				if 'XSIZE' in userdf:
-					query += ", temp.XSIZE"
-				if 'YSIZE' in userdf:
-					query += ", temp.YSIZE"
-				query += " from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
-				
-				df = conn.query_to_pandas(query)
-				curs.execute('drop table {}'.format(tablename))
-				os.remove(OUTDIR+tablename+'.csv')
-				
-				df = df.replace('-9999',np.nan)
-				df = df.replace(-9999.000000,np.nan)
-				dftemp = df[df.isnull().any(axis=1)]
-				unmatched_coords['RA'] = dftemp['RA'].tolist()
-				unmatched_coords['DEC'] = dftemp['DEC'].tolist()
-				df = df.dropna(axis=0, how='any')
+				catalog = 'Y3A2_COADDTILE_GEOM'
+			elif args.db == 'DR1':
+				catalog = 'DR1_Tile_INFO'
+			query += " from {0} temp left outer join {1} m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename, catalog)
 			
-			if args.db == 'DR1':
-				ra_adjust = [360-userdf['RA'][i] if userdf['RA'][i]>180 else userdf['RA'][i] for i in range(len(userdf['RA']))]
-				userdf = userdf.assign(RA_ADJUSTED = ra_adjust)
-				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
-				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
-				
-				query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA, ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME"
-				if 'XSIZE' in userdf:
-					query += ", temp.XSIZE"
-				if 'YSIZE' in userdf:
-					query += ", temp.YSIZE"
-				query += " from {} temp left outer join DR1_TILE_INFO m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMIN)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
-				
-				df = conn.query_to_pandas(query)
-				curs.execute('drop table {}'.format(tablename))
-				os.remove(OUTDIR+tablename+'.csv')
-				
-				df = df.replace('-9999',np.nan)
-				df = df.replace('-0000.000000,np.nan)
-				dftemp = df[df.isnull().any(axis=1)]
-				unmatched_coords['RA'] = dftemp['RA'].tolist()
-				unmatched_coords['DEC'] = dftemp['DEC'].tolist()
-				df = df.dropna(axis=0, how='any')
+			df = conn.query_to_pandas(query)
+			curs.execute('drop table {}'.format(tablename))
+			os.remove(OUTDIR+tablename+'.csv')
 			
-			"""
-			if args.db == 'DR1':
-				for i in range(len(userdf)):
-					ra = userdf['RA'][i]
-					ra180 = ra
-					if ra > 180:
-						ra180 = 360 - ra
-						
-					query = "select * from (select TILENAME from DR1_TILE_INFO where (CROSSRA0='N' and ({0} between RACMIN and RACMAX) and ({1} between DECCMIN and DECCMAX)) or (CROSSRA0='Y' and ({2} between RACMIN-360 and RACMAX) and ({1} between DECCMIN and DECCMAX))) where rownum=1".format(ra, userdf['DEC'][i], ra180)
-					
-					f = conn.query_to_pandas(query)
-					if f.empty:
-						unmatched_coords['RA'].append(userdf['RA'][i])
-						unmatched_coords['DEC'].append(userdf['DEC'][i])
-					else:	
-						df = df.append(f)
-			"""
+			df = df.replace('-9999',np.nan)
+			df = df.replace(-9999.000000,np.nan)
+			dftemp = df[df.isnull().any(axis=1)]
+			unmatched_coords['RA'] = dftemp['RA'].tolist()
+			unmatched_coords['DEC'] = dftemp['DEC'].tolist()
+			df = df.dropna(axis=0, how='any')
 			
 			logger.info('Unmatched coordinates: \n{0}\n{1}'.format(unmatched_coords['RA'], unmatched_coords['DEC']))
 			summary['Unmatched_Coords'] = unmatched_coords
@@ -536,7 +497,11 @@ def run(args):
 					query += ", temp.XSIZE"
 				if 'YSIZE' in userdf:
 					query += ", temp.YSIZE"
-				query += " from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
+				if args.db == 'Y3A2':
+					catalog = 'Y3A2_COADD_OBJECT_SUMMARY'
+				elif args.db == 'DR1':
+					catalog = 'DR1_MAIN'
+				query += " from {0} temp left outer join {1} m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename, catalog)
 				
 				df = conn.query_to_pandas(query)
 				curs.execute('drop table {}'.format(tablename))
@@ -547,39 +512,6 @@ def run(args):
 				dftemp = df[df.isnull().any(axis=1)]
 				unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
 				df = df.dropna(axis=0, how='any')
-			
-			if args.db == 'DR1':
-				userdf.to_csv(OUTDIR=tablename+'.csv', index=False)
-				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
-				
-				query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME"
-				if 'XSIZE' in userdf:
-					query += ", temp.XSIZE"
-				if 'YSIZE' in userdf:
-					query += ", temp.YSIZE"
-				query += " from {} temp left outer join DR1_MAIN m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
-				
-				df = conn.query_to_pandas(query)
-				curs.execute('drop table {}'.format(tablename))
-				os.remove(OUTDIR+tablename+'.csv')
-				
-				df = df.replace('-9999',np.nan)
-				df = df.replace(-9999.000000,np.nan)
-				dftemp = df[df.isnull().any(axis=1)]
-				unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
-				df = df.dropna(axis=0, how='any')
-			
-			"""
-			if args.db == 'DR1':
-				for i in range(len(userdf)):
-					query = "select COADD_OBJECT_ID, ALPHAWIN_J2000, DELTAWIN_J2000, RA, DEC, TILENAME from DR1_MAIN where COADD_OBJECT_ID={0}".format(userdf['COADD_OBJECT_ID'][i])
-					
-					f = conn.query_to_pandas(query)
-					if f.empty:
-						unmatched_coadds.append(userdf['COADD_OBJECT_ID'][i])
-					else:
-						df = df.append(f)
-			"""
 			
 			logger.info('Unmatched coadd ID\'s: \n{}'.format(unmatched_coadds))
 			summary['Unmatched_Coadds'] = unmatched_coadds
