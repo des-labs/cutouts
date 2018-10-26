@@ -1,12 +1,8 @@
 #!/usr/bin/env python
 
 """
-TESTS:
-Options: time mpirun -n 6 python bulkthumbs_11.py --csv des_tiles_sample_135518_coadds.csv --make_pngs --xsize 1 --ysize 1
-	6 cores: (ncsa) 
-
-Options: time mpirun -n 6 python bulkthumbs_11.py --csv des_tiles_sample_129411_coords.csv --make_pngs --xsize 1 --ysize 1
-	6 cores: (ncsa) 
+author: Landon Gelman, 2018
+description: command line tools for making large numbers and multiple kinds of cutouts from the Dark Energy Survey catalogs
 """
 
 import os, sys
@@ -39,6 +35,8 @@ ARCMIN_TO_DEG = 0.0166667		# deg per arcmin
 
 TILES_FOLDER = ''
 OUTDIR = ''
+DR1_UU = ''
+DR1_PP = ''
 
 comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
@@ -74,8 +72,6 @@ def getPathSize(path):
 		if entry.is_dir(follow_symlinks=False):
 			dirsize += getPathSize(entry.path)
 		else:
-			#dirsize += os.path.getsize(entry)
-			
 			try:
 				dirsize += os.path.getsize(entry)
 			except FileNotFoundError:
@@ -99,9 +95,6 @@ def _DecConverter(ra, dec):
 	decOUT = '-{0:02d}{1:02d}{2:02.4f}'.format(decDD, decMM, decSS) if dec < 0 else '+{0:02d}{1:02d}{2:02.4f}'.format(decDD, decMM, decSS)
 	
 	return raOUT + decOUT
-
-
-
 
 def MakeRGB(df, p, xs, ys, r, g, b, w, bp, s, q):
 	pixelscale = utils.proj_plane_pixel_scales(w)
@@ -196,11 +189,6 @@ def MakeLuptonRGB(tiledir, outdir, df, positions, xs, ys, colors, bp, s, q):
 		
 		
 	logger.info('MakeLuptonRGB - Tile {} complete.'.format(df['TILENAME'][0]))
-
-
-
-
-
 
 def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 	logger = logging.getLogger(__name__)
@@ -354,10 +342,13 @@ def run(args):
 	if rank == 0:
 		if args.db == 'DR1':
 			db = 'desdr'
+			uu = DR1_UU
+			pp = DR1_PP
+			conn = ea.connect(db, user=uu, passwd=pp)
 		elif args.db == 'Y3A2':
 			db = 'dessci'
+			conn = ea.connect(db)
 		
-		conn = ea.connect(db)
 		curs = conn.cursor()
 		
 		usernm = str(conn.user)
@@ -397,17 +388,10 @@ def run(args):
 	xs = float(args.xsize)
 	ys = float(args.ysize)
 	colors = args.colors.split(',')
-	#usernm = ''
-	#jobid = ''
-	#outdir = ''
 	
 	if rank == 0:
 		summary = {}
 		start = time.time()
-		#if args.db == 'DR1':
-		#	db = 'desdr'
-		#elif args.db == 'Y3A2':
-		#	db = 'dessci'
 		
 		logger.info('Selected Options:')
 		
@@ -437,19 +421,19 @@ def run(args):
 		logger.info('    Make TIFFs? '+str(args.make_tiffs))
 		logger.info('    Make PNGs? '+str(args.make_pngs))
 		logger.info('    Make FITS? '+str(args.make_fits))
-		logger.info('    Make RGBs? {}'.format('True' if args.make_rgb else 'False'))
+		logger.info('    Make RGBs? {}'.format('True' if args.make_rgbs else 'False'))
 		summary['xsize'] = str(args.xsize)
 		summary['ysize'] = str(args.ysize)
 		summary['make_tiffs'] = str(args.make_tiffs)
 		summary['make_pngs'] = str(args.make_pngs)
 		summary['make_fits'] = str(args.make_fits)
-		summary['make_rgb'] = 'True' if args.make_rgb else 'False'
+		summary['make_rgbs'] = 'True' if args.make_rgbs else 'False'
 		if args.make_fits:
 			logger.info('        Bands: '+args.colors)
 			summary['bands'] = args.colors
-		if args.make_rgb:
-			logger.info('        Bands: '+str(args.make_rgb))
-			summary['rgb_colors'] = args.make_rgb
+		if args.make_rgbs:
+			logger.info('        Bands: '+str(args.make_rgbs))
+			summary['rgb_colors'] = args.make_rgbs
 		summary['db'] = args.db
 		
 		df = pd.DataFrame()
@@ -463,82 +447,64 @@ def run(args):
 		
 		tablename = 'BTL_'+jobid.upper().replace("-","_")	# "BulkThumbs_List_<jobid>"
 		if 'RA' in userdf:
-			if args.db == 'Y3A2':
-				ra_adjust = [360-userdf['RA'][i] if userdf['RA'][i]>180 else userdf['RA'][i] for i in range(len(userdf['RA']))]
-				userdf = userdf.assign(RA_ADJUSTED = ra_adjust)
-				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
-				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
-				
-				#query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
-				query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME"
-				if 'XSIZE' in userdf:
-					query += ", temp.XSIZE"
-				if 'YSIZE' in userdf:
-					query += ", temp.YSIZE"
-				query += " from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
-				
-				df = conn.query_to_pandas(query)
-				curs.execute('drop table {}'.format(tablename))
-				os.remove(OUTDIR+tablename+'.csv')
-				
-				df = df.replace('-9999',np.nan)
-				df = df.replace(-9999.000000,np.nan)
-				dftemp = df[df.isnull().any(axis=1)]
-				unmatched_coords['RA'] = dftemp['RA'].tolist()
-				unmatched_coords['DEC'] = dftemp['DEC'].tolist()
-				df = df.dropna(axis=0, how='any')
+			ra_adjust = [360-userdf['RA'][i] if userdf['RA'][i]>180 else userdf['RA'][i] for i in range(len(userdf['RA']))]
+			userdf = userdf.assign(RA_ADJUSTED = ra_adjust)
+			userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
+			conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
 			
-			if args.db == 'DR1':
-				for i in range(len(userdf)):
-					ra = userdf['RA'][i]
-					ra180 = ra
-					if ra > 180:
-						ra180 = 360 - ra
-						
-					query = "select * from (select TILENAME from DR1_TILE_INFO where (CROSSRA0='N' and ({0} between RACMIN and RACMAX) and ({1} between DECCMIN and DECCMAX)) or (CROSSRA0='Y' and ({2} between RACMIN-360 and RACMAX) and ({1} between DECCMIN and DECCMAX))) where rownum=1".format(ra, userdf['DEC'][i], ra180)
-					
-					f = conn.query_to_pandas(query)
-					if f.empty:
-						unmatched_coords['RA'].append(userdf['RA'][i])
-						unmatched_coords['DEC'].append(userdf['DEC'][i])
-					else:	
-						df = df.append(f)
+			#query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME from {} temp left outer join Y3A2_COADDTILE_GEOM m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename)
+			query = "select temp.RA, temp.DEC, temp.RA_ADJUSTED, temp.RA as ALPHAWIN_J2000, temp.DEC as DELTAWIN_J2000, m.TILENAME"
+			if 'XSIZE' in userdf:
+				query += ", temp.XSIZE"
+			if 'YSIZE' in userdf:
+				query += ", temp.YSIZE"
+			if args.db == 'Y3A2':
+				catalog = 'Y3A2_COADDTILE_GEOM'
+			elif args.db == 'DR1':
+				catalog = 'DR1_Tile_INFO'
+			query += " from {0} temp left outer join {1} m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename, catalog)
+			
+			df = conn.query_to_pandas(query)
+			curs.execute('drop table {}'.format(tablename))
+			os.remove(OUTDIR+tablename+'.csv')
+			
+			df = df.replace('-9999',np.nan)
+			df = df.replace(-9999.000000,np.nan)
+			dftemp = df[df.isnull().any(axis=1)]
+			unmatched_coords['RA'] = dftemp['RA'].tolist()
+			unmatched_coords['DEC'] = dftemp['DEC'].tolist()
+			df = df.dropna(axis=0, how='any')
+			
 			logger.info('Unmatched coordinates: \n{0}\n{1}'.format(unmatched_coords['RA'], unmatched_coords['DEC']))
 			summary['Unmatched_Coords'] = unmatched_coords
 			print(unmatched_coords)
 		
 		if 'COADD_OBJECT_ID' in userdf:
-			if args.db == 'Y3A2':
-				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
-				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
-				
-				#query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
-				query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME"
-				if 'XSIZE' in userdf:
-					query += ", temp.XSIZE"
-				if 'YSIZE' in userdf:
-					query += ", temp.YSIZE"
-				query += " from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
-				
-				df = conn.query_to_pandas(query)
-				curs.execute('drop table {}'.format(tablename))
-				os.remove(OUTDIR+tablename+'.csv')
-				
-				df = df.replace('-9999',np.nan)
-				df = df.replace(-9999.000000,np.nan)
-				dftemp = df[df.isnull().any(axis=1)]
-				unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
-				df = df.dropna(axis=0, how='any')
+			userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
+			conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
 			
-			if args.db == 'DR1':
-				for i in range(len(userdf)):
-					query = "select COADD_OBJECT_ID, ALPHAWIN_J2000, DELTAWIN_J2000, RA, DEC, TILENAME from DR1_MAIN where COADD_OBJECT_ID={0}".format(userdf['COADD_OBJECT_ID'][i])
-					
-					f = conn.query_to_pandas(query)
-					if f.empty:
-						unmatched_coadds.append(userdf['COADD_OBJECT_ID'][i])
-					else:
-						df = df.append(f)
+			#query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
+			query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME"
+			if 'XSIZE' in userdf:
+				query += ", temp.XSIZE"
+			if 'YSIZE' in userdf:
+				query += ", temp.YSIZE"
+			if args.db == 'Y3A2':
+				catalog = 'Y3A2_COADD_OBJECT_SUMMARY'
+			elif args.db == 'DR1':
+				catalog = 'DR1_MAIN'
+			query += " from {0} temp left outer join {1} m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename, catalog)
+			
+			df = conn.query_to_pandas(query)
+			curs.execute('drop table {}'.format(tablename))
+			os.remove(OUTDIR+tablename+'.csv')
+			
+			df = df.replace('-9999',np.nan)
+			df = df.replace(-9999.000000,np.nan)
+			dftemp = df[df.isnull().any(axis=1)]
+			unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
+			df = df.dropna(axis=0, how='any')
+			
 			logger.info('Unmatched coadd ID\'s: \n{}'.format(unmatched_coadds))
 			summary['Unmatched_Coadds'] = unmatched_coadds
 			print(unmatched_coadds)
@@ -579,8 +545,8 @@ def run(args):
 		if args.make_fits:
 			MakeFitsCut(tiledir, outdir+i+'/', size, positions, colors, udf)
 		
-		if args.make_rgb:
-			MakeLuptonRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.make_rgb, args.rgb_minimum, args.rgb_stretch, args.rgb_asinh)
+		if args.make_rgbs:
+			MakeLuptonRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.make_rgbs, args.rgb_minimum, args.rgb_stretch, args.rgb_asinh)
 	
 	comm.Barrier()
 	
@@ -632,7 +598,7 @@ if __name__ == '__main__':
 	parser.add_argument('--make_tiffs', action='store_true', help='Creates a TIFF file of the cutout region.')
 	parser.add_argument('--make_fits', action='store_true', help='Creates FITS files in the desired bands of the cutout region.')
 	parser.add_argument('--make_pngs', action='store_true', help='Creates a PNG file of the cutout region.')
-	parser.add_argument('--make_rgb', action='append', type=str.lower, help='Creates 3-color images using the bands you select (reddest to bluest), e.g.: --make_rgb i,r,g --make_rgb z,i,r --make_rgb z,r,g')
+	parser.add_argument('--make_rgbs', action='append', type=str.lower, help='Creates 3-color images using the bands you select (reddest to bluest), e.g.: --make_rgbs i,r,g --make_rgbs z,i,r --make_rgbs z,r,g')
 	parser.add_argument('--return_list', action='store_true', help='Saves list of inputted objects and their matched tiles to user directory.')
 	
 	parser.add_argument('--xsize', default=1.0, help='Size in arcminutes of the cutout x-axis. Default: 1.0')
@@ -643,7 +609,7 @@ if __name__ == '__main__':
 	parser.add_argument('--rgb_stretch', default=50.0, help='The linear stretch of the image. Default 50.0.')
 	parser.add_argument('--rgb_asinh', default=10.0, help='The asinh softening parameter. Default 10.0')
 	
-	parser.add_argument('--db', default='Y3A2', type=str.upper, required=False, help='Which database to use. Default: Y3A2 Options: DR1 (very slow), Y3A2 (much faster).')
+	parser.add_argument('--db', default='Y3A2', type=str.upper, required=False, help='Which database to use. Default: Y3A2, Options: DR1, Y3A2.')
 	parser.add_argument('--jobid', required=False, help='Option to manually specify a jobid for this job.')
 	#parser.add_argument('--usernm', required=False, help='Username for database; otherwise uses values from desservices file.')
 	#parser.add_argument('--passwd', required=False, help='Password for database; otherwise uses values from desservices file.')
@@ -658,6 +624,8 @@ if __name__ == '__main__':
 		conf = yaml.load(cfile)
 	TILES_FOLDER = conf['directories']['tiles'] + '/'
 	OUTDIR = conf['directories']['outdir'] + '/'
+	DR1_UU = conf['dr1_user']['usernm']
+	DR1_PP = conf['dr1_user']['passwd']
 	
 	if not args.csv and not (args.ra and args.dec) and not args.coadd:
 		print('Please include either RA/DEC coordinates or Coadd IDs.')
@@ -668,7 +636,7 @@ if __name__ == '__main__':
 	if (args.ra and not args.dec) or (args.dec and not args.ra):
 		print('Please include BOTH RA and DEC if not using Coadd IDs.')
 		sys.exit(1)
-	if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.make_rgb and not args.return_list:
+	if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.make_rgbs and not args.return_list:
 		print('Nothing to do. Please select either/both make_tiff and make_fits.')
 		sys.exit(1)
 	
