@@ -35,6 +35,8 @@ ARCMIN_TO_DEG = 0.0166667		# deg per arcmin
 
 TILES_FOLDER = ''
 OUTDIR = ''
+DR1_UU = ''
+DR1_PP = ''
 
 comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
@@ -340,8 +342,8 @@ def run(args):
 	if rank == 0:
 		if args.db == 'DR1':
 			db = 'desdr'
-			uu = 'desbulk'
-			pp = 'blah' 		# Please fix this later
+			uu = DR1_UU
+			pp = DR1_PP
 			conn = ea.connect(db, user=uu, passwd=pp)
 		elif args.db == 'Y3A2':
 			db = 'dessci'
@@ -419,19 +421,19 @@ def run(args):
 		logger.info('    Make TIFFs? '+str(args.make_tiffs))
 		logger.info('    Make PNGs? '+str(args.make_pngs))
 		logger.info('    Make FITS? '+str(args.make_fits))
-		logger.info('    Make RGBs? {}'.format('True' if args.make_rgb else 'False'))
+		logger.info('    Make RGBs? {}'.format('True' if args.make_rgbs else 'False'))
 		summary['xsize'] = str(args.xsize)
 		summary['ysize'] = str(args.ysize)
 		summary['make_tiffs'] = str(args.make_tiffs)
 		summary['make_pngs'] = str(args.make_pngs)
 		summary['make_fits'] = str(args.make_fits)
-		summary['make_rgb'] = 'True' if args.make_rgb else 'False'
+		summary['make_rgbs'] = 'True' if args.make_rgbs else 'False'
 		if args.make_fits:
 			logger.info('        Bands: '+args.colors)
 			summary['bands'] = args.colors
-		if args.make_rgb:
-			logger.info('        Bands: '+str(args.make_rgb))
-			summary['rgb_colors'] = args.make_rgb
+		if args.make_rgbs:
+			logger.info('        Bands: '+str(args.make_rgbs))
+			summary['rgb_colors'] = args.make_rgbs
 		summary['db'] = args.db
 		
 		df = pd.DataFrame()
@@ -544,8 +546,8 @@ def run(args):
 		if args.make_fits:
 			MakeFitsCut(tiledir, outdir+i+'/', size, positions, colors, udf)
 		
-		if args.make_rgb:
-			MakeLuptonRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.make_rgb, args.rgb_minimum, args.rgb_stretch, args.rgb_asinh)
+		if args.make_rgbs:
+			MakeLuptonRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.make_rgbs, args.rgb_minimum, args.rgb_stretch, args.rgb_asinh)
 	
 	comm.Barrier()
 	
@@ -597,7 +599,7 @@ if __name__ == '__main__':
 	parser.add_argument('--make_tiffs', action='store_true', help='Creates a TIFF file of the cutout region.')
 	parser.add_argument('--make_fits', action='store_true', help='Creates FITS files in the desired bands of the cutout region.')
 	parser.add_argument('--make_pngs', action='store_true', help='Creates a PNG file of the cutout region.')
-	parser.add_argument('--make_rgb', action='append', type=str.lower, help='Creates 3-color images using the bands you select (reddest to bluest), e.g.: --make_rgb i,r,g --make_rgb z,i,r --make_rgb z,r,g')
+	parser.add_argument('--make_rgbs', action='append', type=str.lower, help='Creates 3-color images using the bands you select (reddest to bluest), e.g.: --make_rgbs i,r,g --make_rgbs z,i,r --make_rgbs z,r,g')
 	parser.add_argument('--return_list', action='store_true', help='Saves list of inputted objects and their matched tiles to user directory.')
 	
 	parser.add_argument('--xsize', default=1.0, help='Size in arcminutes of the cutout x-axis. Default: 1.0')
@@ -623,6 +625,8 @@ if __name__ == '__main__':
 		conf = yaml.load(cfile)
 	TILES_FOLDER = conf['directories']['tiles'] + '/'
 	OUTDIR = conf['directories']['outdir'] + '/'
+	DR1_UU = conf['dr1_user']['usernm']
+	DR1_PP = conf['dr1_user']['passwd']
 	
 	if not args.csv and not (args.ra and args.dec) and not args.coadd:
 		print('Please include either RA/DEC coordinates or Coadd IDs.')
@@ -633,7 +637,7 @@ if __name__ == '__main__':
 	if (args.ra and not args.dec) or (args.dec and not args.ra):
 		print('Please include BOTH RA and DEC if not using Coadd IDs.')
 		sys.exit(1)
-	if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.make_rgb and not args.return_list:
+	if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.make_rgbs and not args.return_list:
 		print('Nothing to do. Please select either/both make_tiff and make_fits.')
 		sys.exit(1)
 	
