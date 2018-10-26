@@ -2,7 +2,7 @@
 
 """
 author: Landon Gelman, 2018
-description: command line tools for making large numbers and different kinds of cutouts from the Dark Energy Survey catalogs
+description: command line tools for making large numbers and multiple kinds of cutouts from the Dark Energy Survey catalogs
 """
 
 import os, sys
@@ -480,31 +480,30 @@ def run(args):
 			print(unmatched_coords)
 		
 		if 'COADD_OBJECT_ID' in userdf:
+			userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
+			conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
+			
+			#query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
+			query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME"
+			if 'XSIZE' in userdf:
+				query += ", temp.XSIZE"
+			if 'YSIZE' in userdf:
+				query += ", temp.YSIZE"
 			if args.db == 'Y3A2':
-				userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
-				conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
-				
-				#query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
-				query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME"
-				if 'XSIZE' in userdf:
-					query += ", temp.XSIZE"
-				if 'YSIZE' in userdf:
-					query += ", temp.YSIZE"
-				if args.db == 'Y3A2':
-					catalog = 'Y3A2_COADD_OBJECT_SUMMARY'
-				elif args.db == 'DR1':
-					catalog = 'DR1_MAIN'
-				query += " from {0} temp left outer join {1} m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename, catalog)
-				
-				df = conn.query_to_pandas(query)
-				curs.execute('drop table {}'.format(tablename))
-				os.remove(OUTDIR+tablename+'.csv')
-				
-				df = df.replace('-9999',np.nan)
-				df = df.replace(-9999.000000,np.nan)
-				dftemp = df[df.isnull().any(axis=1)]
-				unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
-				df = df.dropna(axis=0, how='any')
+				catalog = 'Y3A2_COADD_OBJECT_SUMMARY'
+			elif args.db == 'DR1':
+				catalog = 'DR1_MAIN'
+			query += " from {0} temp left outer join {1} m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename, catalog)
+			
+			df = conn.query_to_pandas(query)
+			curs.execute('drop table {}'.format(tablename))
+			os.remove(OUTDIR+tablename+'.csv')
+			
+			df = df.replace('-9999',np.nan)
+			df = df.replace(-9999.000000,np.nan)
+			dftemp = df[df.isnull().any(axis=1)]
+			unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
+			df = df.dropna(axis=0, how='any')
 			
 			logger.info('Unmatched coadd ID\'s: \n{}'.format(unmatched_coadds))
 			summary['Unmatched_Coadds'] = unmatched_coadds
@@ -610,7 +609,7 @@ if __name__ == '__main__':
 	parser.add_argument('--rgb_stretch', default=50.0, help='The linear stretch of the image. Default 50.0.')
 	parser.add_argument('--rgb_asinh', default=10.0, help='The asinh softening parameter. Default 10.0')
 	
-	parser.add_argument('--db', default='Y3A2', type=str.upper, required=False, help='Which database to use. Default: Y3A2 Options: DR1 (very slow), Y3A2 (much faster).')
+	parser.add_argument('--db', default='Y3A2', type=str.upper, required=False, help='Which database to use. Default: Y3A2, Options: DR1, Y3A2.')
 	parser.add_argument('--jobid', required=False, help='Option to manually specify a jobid for this job.')
 	#parser.add_argument('--usernm', required=False, help='Username for database; otherwise uses values from desservices file.')
 	#parser.add_argument('--passwd', required=False, help='Password for database; otherwise uses values from desservices file.')
