@@ -1,8 +1,8 @@
 # cutouts
 
-Current working version: bulkthumbs_9.py
+Current stable version: bulkthumbs_12.py
 
-Current development version: #9
+Current development version: ...
 
 ## Requirements (also in requirments.txt in master branch):
 ```
@@ -18,11 +18,14 @@ yaml
 ```
 ## Options when running (from the built-in help):
 ```
-usage: bulkthumbs_9.py [-h] [--csv CSV] [--ra [RA [RA ...]]]
-                       [--dec [DEC [DEC ...]]] [--coadd [COADD [COADD ...]]]
-                       [--make_tiffs] [--make_fits] [--make_pngs]
-                       [--xsize XSIZE] [--ysize YSIZE] [--colors COLORS]
-                       [--db DB]
+usage: bulkthumbs_12.py [-h] [--csv CSV] [--ra [RA [RA ...]]]
+                        [--dec [DEC [DEC ...]]] [--coadd [COADD [COADD ...]]]
+                        [--make_tiffs] [--make_fits] [--make_pngs]
+                        [--make_rgbs MAKE_RGBS] [--return_list]
+                        [--xsize XSIZE] [--ysize YSIZE] [--colors COLORS]
+                        [--rgb_minimum RGB_MINIMUM]
+                        [--rgb_stretch RGB_STRETCH] [--rgb_asinh RGB_ASINH]
+                        [--db DB] [--jobid JOBID]
 
 This program will make any number of cutouts, using the master tiles.
 
@@ -38,11 +41,24 @@ optional arguments:
   --make_fits           Creates FITS files in the desired bands of the cutout
                         region.
   --make_pngs           Creates a PNG file of the cutout region.
+  --make_rgbs MAKE_RGBS
+                        Creates 3-color images using the bands you select
+                        (reddest to bluest), e.g.: --make_rgbs i,r,g
+                        --make_rgbs z,i,r --make_rgbs z,r,g
+  --return_list         Saves list of inputted objects and their matched tiles
+                        to user directory.
   --xsize XSIZE         Size in arcminutes of the cutout x-axis. Default: 1.0
   --ysize YSIZE         Size in arcminutes of the cutout y-axis. Default: 1.0
   --colors COLORS       Color bands for the fits cutout. Default: i
-  --db DB               Which database to use. Default: Y3A2 Options: DR1,
+  --rgb_minimum RGB_MINIMUM
+                        The black point for the 3-color image. Default 1.0
+  --rgb_stretch RGB_STRETCH
+                        The linear stretch of the image. Default 50.0.
+  --rgb_asinh RGB_ASINH
+                        The asinh softening parameter. Default 10.0
+  --db DB               Which database to use. Default: Y3A2, Options: DR1,
                         Y3A2.
+  --jobid JOBID         Option to manually specify a jobid for this job.
 ```
 ### Example using a CSV:
 `mpirun -n 6 python bulkthumbs_9.py --csv <user/path/to/csv/file> --make_pngs --make_fits --xsize 3 --ysize 2 --colors r,Y --db Y3A2`
