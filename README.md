@@ -41,27 +41,23 @@ optional arguments:
   --make_fits           Creates FITS files in the desired bands of the cutout
                         region.
   --make_pngs           Creates a PNG file of the cutout region.
-  --make_rgbs MAKE_RGBS
-                        Creates 3-color images using the bands you select
+  --make_rgbs           Creates 3-color images using the bands you select
                         (reddest to bluest), e.g.: --make_rgbs i,r,g
                         --make_rgbs z,i,r --make_rgbs z,r,g
   --return_list         Saves list of inputted objects and their matched tiles
                         to user directory.
   --xsize XSIZE         Size in arcminutes of the cutout x-axis. Default: 1.0
   --ysize YSIZE         Size in arcminutes of the cutout y-axis. Default: 1.0
-  --colors COLORS       Color bands for the fits cutout. Default: i
-  --rgb_minimum RGB_MINIMUM
-                        The black point for the 3-color image. Default 1.0
-  --rgb_stretch RGB_STRETCH
-                        The linear stretch of the image. Default 50.0.
-  --rgb_asinh RGB_ASINH
-                        The asinh softening parameter. Default 10.0
+  --colors              Color bands for the fits cutout. Default: i
+  --rgb_minimum         The black point for the 3-color image. Default 1.0
+  --rgb_stretch         The linear stretch of the image. Default 50.0.
+  --rgb_asinh           The asinh softening parameter. Default 10.0
   --db DB               Which database to use. Default: Y3A2, Options: DR1,
                         Y3A2.
-  --jobid JOBID         Option to manually specify a jobid for this job.
+  --jobid               Option to manually specify a jobid for this job.
 ```
 ### Example using a CSV:
-`mpirun -n 6 python bulkthumbs_9.py --csv <user/path/to/csv/file> --make_pngs --make_fits --xsize 3 --ysize 2 --colors r,Y --db Y3A2`
+`mpirun -n 6 python bulkthumbs_9.py --csv /path/to/csv/file --make_pngs --make_fits --colors r,Y --xsize 3 --ysize 2 --db Y3A2`
 
 ### Example using a list of coordinates:
-`mpirun -n 6 python bulkthumbs_9.py --ra 4.9703 10.1415 --dec -48.9987 -62.0329 --make_pngs --make_fits --xsize 1 --ysize 1 --colors g,r,i,z,Y --db Y3A2`
+`mpirun -n 6 python bulkthumbs_9.py --ra 4.9703 10.1415 --dec -48.9987 -62.0329 --make_pngs --make_fits --colors g,r,i,z,Y --make_rgbs i,r,g --make_rgb z,r,g --xsize 1 --ysize 1 --db DR1`
