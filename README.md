@@ -57,7 +57,7 @@ optional arguments:
   --jobid               Option to manually specify a jobid for this job.
 ```
 ### Example using a CSV:
-`mpirun -n 6 python bulkthumbs_9.py --csv /path/to/csv/file --make_pngs --make_fits --colors r,Y --xsize 3 --ysize 2 --db Y3A2`
+`mpirun -n 6 python bulkthumbs_12.py --csv /path/to/csv/file --make_pngs --make_fits --colors r,Y --xsize 3 --ysize 2 --db Y3A2`
 
 ### Example using a list of coordinates:
-`mpirun -n 6 python bulkthumbs_9.py --ra 4.9703 10.1415 --dec -48.9987 -62.0329 --make_pngs --make_fits --colors g,r,i,z,Y --make_rgbs i,r,g --make_rgb z,r,g --xsize 1 --ysize 1 --db DR1`
+`mpirun -n 6 python bulkthumbs_12.py --ra 4.9703 10.1415 --dec -48.9987 -62.0329 --make_pngs --make_fits --colors g,r,i,z,Y --make_rgbs i,r,g --make_rgb z,r,g --xsize 1 --ysize 1 --db DR1`
