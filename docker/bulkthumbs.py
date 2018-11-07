@@ -85,14 +85,14 @@ def _DecConverter(ra, dec):
 	raMM = int((ra1 - raHH) * 60)
 	raSS = (((ra1 - raHH) * 60) - raMM) * 60
 	raSS = np.round(raSS, decimals=4)
-	raOUT = '{0:02d}{1:02d}{2:02.4f}'.format(raHH, raMM, raSS) if ra > 0 else '-{0:02d}{1:02d}{2:02.4f}'.format(raHH, raMM, raSS)
+	raOUT = '{0:02d}{1:02d}{2:07.4f}'.format(raHH, raMM, raSS) if ra > 0 else '-{0:02d}{1:02d}{2:07.4f}'.format(raHH, raMM, raSS)
 	
 	dec1 = np.abs(dec)
 	decDD = int(dec1)
 	decMM = int((dec1 - decDD) * 60)
 	decSS = (((dec1 - decDD) * 60) - decMM) * 60
 	decSS = np.round(decSS, decimals=4)
-	decOUT = '-{0:02d}{1:02d}{2:02.4f}'.format(decDD, decMM, decSS) if dec < 0 else '+{0:02d}{1:02d}{2:02.4f}'.format(decDD, decMM, decSS)
+	decOUT = '-{0:02d}{1:02d}{2:07.4f}'.format(decDD, decMM, decSS) if dec < 0 else '+{0:02d}{1:02d}{2:07.4f}'.format(decDD, decMM, decSS)
 	
 	return raOUT + decOUT
 
@@ -316,8 +316,8 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 				
 				header['CRPIX1'] = crpix1
 				header['CRPIX2'] = crpix2
-				header['CRVAL1'] = str(crval1)
-				header['CRVAL2'] = str(crval2)
+				header['CRVAL1'] = float(crval1)
+				header['CRVAL2'] = float(crval2)
 				header['HIERARCH RA_CUTOUT'] = df['RA'][p]
 				header['HIERARCH DEC_CUTOUT'] = df['DEC'][p]
 				
@@ -613,6 +613,7 @@ if __name__ == '__main__':
 	parser.add_argument('--jobid', required=False, help='Option to manually specify a jobid for this job.')
 	#parser.add_argument('--usernm', required=False, help='Username for database; otherwise uses values from desservices file.')
 	#parser.add_argument('--passwd', required=False, help='Password for database; otherwise uses values from desservices file.')
+	parser.add_argument('--outdir', required=False, help='Overwrite for output directory.')
 	
 	if len(sys.argv) == 1:
 		parser.print_help()
@@ -623,7 +624,10 @@ if __name__ == '__main__':
 	with open('config/bulkthumbsconfig.yaml','r') as cfile:
 		conf = yaml.load(cfile)
 	TILES_FOLDER = conf['directories']['tiles'] + '/'
-	OUTDIR = conf['directories']['outdir'] + '/'
+	if args.outdir:
+		OUTDIR = args.outdir
+	else:
+		OUTDIR = conf['directories']['outdir'] + '/'
 	DR1_UU = conf['dr1_user']['usernm']
 	DR1_PP = conf['dr1_user']['passwd']
 	
