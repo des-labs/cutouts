@@ -243,10 +243,10 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
 		else:
 			udy = dy
 		
-		left = max(0, pixcoords[0][i] - udx)
-		upper = max(0, im.size[1] - pixcoords[1][i] - udy)
-		right = min(pixcoords[0][i] + udx, 10000)
-		lower = min(im.size[1] - pixcoords[1][i] + udy, 10000)
+		left = int(max(0, pixcoords[0][i] - udx))
+		upper = int(max(0, im.size[1] - pixcoords[1][i] - udy))
+		right = int(min(pixcoords[0][i] + udx, 10000))
+		lower = int(min(im.size[1] - pixcoords[1][i] + udy, 10000))
 		newimg = im.crop((left, upper, right, lower))
 		
 		if maketiff:
