@@ -470,10 +470,11 @@ def run(args):
 			
 			df = df.replace('-9999',np.nan)
 			df = df.replace(-9999.000000,np.nan)
-			dftemp = df[df.isnull().any(axis=1)]
+			#dftemp = df[df.isnull().any(axis=1)]
+			dftemp = df[ (df['TILENAME'].isnull()) ]
 			unmatched_coords['RA'] = dftemp['RA'].tolist()
 			unmatched_coords['DEC'] = dftemp['DEC'].tolist()
-			df = df.dropna(axis=0, how='any')
+			df = df.dropna(axis=0, how='any', subset=['TILENAME'])
 			
 			logger.info('Unmatched coordinates: \n{0}\n{1}'.format(unmatched_coords['RA'], unmatched_coords['DEC']))
 			summary['Unmatched_Coords'] = unmatched_coords
@@ -501,9 +502,10 @@ def run(args):
 			
 			df = df.replace('-9999',np.nan)
 			df = df.replace(-9999.000000,np.nan)
-			dftemp = df[df.isnull().any(axis=1)]
+			#dftemp = df[df.isnull().any(axis=1)]
+			dftemp = df[ (df['TILENAME'].isnull()) | (df['ALPHAWIN_J2000'].isnull()) | (df['DELTAWIN_J2000'].isnull()) | (df['RA'].isnull()) | (df['DEC'].isnull()) ]
 			unmatched_coadds = dftemp['COADD_OBJECT_ID'].tolist()
-			df = df.dropna(axis=0, how='any')
+			df = df.dropna(axis=0, how='any', subset=['TILENAME','ALPHAWIN_J2000','DELTAWIN_J2000','RA','DEC'])
 			
 			logger.info('Unmatched coadd ID\'s: \n{}'.format(unmatched_coadds))
 			summary['Unmatched_Coadds'] = unmatched_coadds
