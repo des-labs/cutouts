@@ -33,18 +33,31 @@ RUN curl -sSL https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64
     && apt-get -qq -y autoremove \
     && apt-get autoclean \
     && rm -rf /var/lib/apt/lists/* /var/log/dpkg.log \
-    && conda clean --all --yes 
-    
-#STIFF 
+    && conda clean --all --yes
+
+#STIFF
 RUN wget https://www.astromatic.net/download/stiff/stiff-2.4.0.tar.gz -P /tmp \
-    && gzip -dc /tmp/stiff-2.4.0.tar.gz | tar xvf - -C /bin/ \ 
-    && cd /bin/stiff-2.4.0 \
+    && gzip -dc /tmp/stiff-2.4.0.tar.gz | tar xvf - -C /tmp/ \
+    && cd /tmp/stiff-2.4.0 \
     && ./configure \
     && make \
     && make install \
     && make clean
 
-#RUN conda install  easyaccess -c mgckind
+#FUNPACK
+RUN wget http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio_latest.tar.gz -P /tmp \
+    && gzip -dc /tmp/cfitsio_latest.tar.gz | tar xvf - -C /tmp/ \
+    && cd /tmp/cfitsio \
+    && ./configure \
+    && make \
+    && make fpack \
+    && make funpack \
+    && chmod a+x fpack \
+    && chmod a+x funpack \
+    && mv fpack /usr/local/bin/ \
+    && mv funpack /usr/local/bin/ \
+    && make clean
+
 RUN conda install easyaccess==1.4.7 -c mgckind -c anaconda
 RUN conda install -y pip
 
