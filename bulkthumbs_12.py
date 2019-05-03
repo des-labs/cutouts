@@ -346,14 +346,17 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
     logger.info('MakeFitsCut - Tile {} complete.'.format(df['TILENAME'][0]))
     return tuple(out_filenm_cut)
 
-def MakeTiffRGB(par, multithread=True):
+def MakeStiffRGB(par):
     '''
-    Method to create a color image by using STIFF and a combination of 3 bands
+    Method to create a color image by using STIFF and a combination of 3 bands.
+    The final products will be PNGs, removing TIF images
     Works on a tile-basis
     Parameters
     ----------
-    tiledir
-    outdir
+    tiledir: str
+        Path to tile directory
+    outdir: str
+        Path to output files
     size: astropy Quantity
         Box size in arcmin
     positions: astropy SkyCoord
@@ -363,9 +366,15 @@ def MakeTiffRGB(par, multithread=True):
     df: dataframe
         Pandas dtaframe of stamp centers and tilename, for the tile we are
         working in
+    Returns
+    -------
+    list with saved PNGs
     '''
-    # * call with mutiprocessing (STIFF native)
+    # Uncompress parameters
     tiledir, outdir, size, positions, tiff_bands, df = par
+
+    # Invert order of tiff_bands, from RGB to BGR
+    tiff_bands = tuple(list(tiff_bands)[::-1])
 
     # MakeFitsCut already iterates over the tile-dataframe. Take advantage of it
     # Call FITS cut will return groups of band and positions:
@@ -381,27 +390,24 @@ def MakeTiffRGB(par, multithread=True):
         t_e += ' created stamps ({0})'.format(len(df.index))
         t_e += ' for tile {0}'.format(df['TILENAME'].unique())
         logging.error(t_e)
-        exit()
+        sys.exit(1)
 
     # Using the same order in the dataframe, create the output name for the
-    # RGB combined TIFF
+    # RGB combined TIF
     out_stiff = []
     aux_c = 0
     for idx, row in df.iterrows():
-        # TIFF naming
+        # TIF naming
         if 'COADD_OBJECT_ID' in row:
             outnm = outdir + str(row['COADD_OBJECT_ID'])
         else:
             outnm = outdir + 'DESJ' + _DecConverter(row['RA'], row['DEC'])
-        outnm += '.tiff'
-        out_stiff.append(outnm)
+        outnm += '.tif'
 
         # Call STIFF using the same order as in the dataframe
         tmp_rgb = [f[aux_c] for f in fnm_cut]
         cmd_stiff = 'stiff {0}'.format(' '.join(tmp_rgb))
         cmd_stiff += ' -OUTFILE_NAME {0}'.format(outnm)
-        if multithread:
-            cmd_stiff += ' -NTHREADS 0'
         cmd_stiff = shlex.split(cmd_stiff)
         try:
             subprocess.call(cmd_stiff)
@@ -409,6 +415,24 @@ def MakeTiffRGB(par, multithread=True):
         except OSError as e:
             logging.error(e)
             raise
+
+        # Convert TIF to PNG. Then remove TIF
+        outnm_png = outnm.replace('.tif', '.png')
+        cmd_convert = 'convert {0} {1}'.format(outnm, outnm_png)
+        cmd_convert = shlex.split(cmd_convert)
+        try:
+            subprocess.call(cmd_convert)
+            print('Written: %s' % outnm_png)
+        except OSError as e:
+            logging.error(e)
+            raise
+        out_stiff.append(outnm_png)
+        try:
+            os.remove(outnm)
+        except OSError as e:
+            logging.error(e)
+            raise
+
         aux_c += 1
     # Returns list of saved TIFF
     return out_stiff
@@ -419,14 +443,14 @@ def run(args):
     ----------
     coadd: list of str
     colors: str
-    colors_tiff: list of str
+    colors_stiff: list of str
     csv: str
     db: str
     dec: list of floats
     jobid: str
     make_fits: boolean
     make_pngs: boolean
-    make_rgb_tiff: boolean
+    make_rgb_stiff: boolean
     make_rgbs: list of str
     make_tiffs: boolean
     outdir: str
@@ -612,10 +636,6 @@ def run(args):
         df = df.sort_values(by=['TILENAME'])
         df = df.drop_duplicates(['RA','DEC'], keep='first')
 
-        #
-        # Checkpoint
-        print(df)
-
         if args.return_list:
             os.makedirs(outdir, exist_ok=True)
             df.to_csv(outdir+tablename+'.csv', index=False)
@@ -654,11 +674,10 @@ def run(args):
         if args.make_rgbs:
             MakeLuptonRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.make_rgbs, args.rgb_minimum, args.rgb_stretch, args.rgb_asinh)
 
-        if args.make_rgb_tiff:
+        if args.make_rgb_stiff:
             # Working by tilename
-            var_cut = [tiledir, outdir+i+'/', size, positions, args.colors_tiff, udf]
-            var = var_cut
-            MakeTiffRGB(var)
+            var = [tiledir, outdir+i+'/', size, positions, args.colors_stiff, udf]
+            MakeStiffRGB(var)
 
     comm.Barrier()
 
@@ -715,14 +734,15 @@ if __name__ == '__main__':
     parser.add_argument('--make_rgbs', action='append', type=str.lower, help='Creates 3-color images using the bands you select (reddest to bluest), e.g.: --make_rgbs i,r,g --make_rgbs z,i,r --make_rgbs z,r,g')
     # Note: MAKE_RGBS should be boolean and use COLORS from the bands, but
     # modification of other codes would be necessary.
-    parser.add_argument('--make_rgb_tiff', action='store_true', help='Create a TIFF image from the combination of 3 bands. Input desired bands, from bluest to reddest in \'--colors_tiff\' argument')
+    parser.add_argument('--make_rgb_stiff', action='store_true', help='Create a TIFF image from the combination of 3 bands. Input desired bands, from reddest to bluest in \'--colors_stiff\' argument')
     parser.add_argument('--return_list', action='store_true', help='Saves list of inputted objects and their matched tiles to user directory.')
 
     parser.add_argument('--xsize', default=1.0, help='Size in arcminutes of the cutout x-axis. Default: 1.0')
     parser.add_argument('--ysize', default=1.0, help='Size in arcminutes of the cutout y-axis. Default: 1.0')
     parser.add_argument('--colors', default='I', type=str.upper, help='Color bands for the fits cutout. Default: i')
-    aux_tiff_b = ['g', 'r', 'z']
-    parser.add_argument('--colors_tiff', default=aux_tiff_b, nargs=3, metavar=('B', 'G', 'R'), help='Bands from which to combine the TIFF image. Default: {0}'.format(' '.join(aux_tiff_b)))
+    # nargas=3 works with spaces as separator
+    # aux_tiff_b = ['z', 'r', 'g']
+    parser.add_argument('--colors_stiff', action='append', metavar='R,G,B', help='Comma-separated bands from which to combine the TIFF image, e.g.: z,r,g')
 
     parser.add_argument('--rgb_minimum', default=1.0, help='The black point for the 3-color image. Default 1.0')
     parser.add_argument('--rgb_stretch', default=50.0, help='The linear stretch of the image. Default 50.0.')
@@ -759,10 +779,11 @@ if __name__ == '__main__':
     if (args.ra and not args.dec) or (args.dec and not args.ra):
         print('Please include BOTH RA and DEC if not using Coadd IDs.')
         sys.exit(1)
-    if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.make_rgbs and not args.make_rgb_tiff and not args.return_list:
+    if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.make_rgbs and not args.make_rgb_stiff and not args.return_list:
         print('Nothing to do. Please select either/both make_tiff and make_fits.')
         sys.exit(1)
-
-    print(args)
+    if ((args.make_rgb_stiff) and (args.colors_stiff is None)):
+        print('Please include --colors_stiff when calling --make_rgb_stiff creation.')
+        sys.exit(1)
 
     run(args)
