@@ -265,9 +265,6 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
     logger = logging.getLogger(__name__)
     os.makedirs(outdir, exist_ok=True)            # Check if outdir exists
 
-    # This auxiliary list will serve to keep track of the output filenames
-    # This method works on band-basis. First groups by band, then by positions
-    out_filenm_cut = []
     for c in range(len(colors)):        # Iterate over all desired colors
         # Finish the tile's name and open the file. Camel-case check is required because Y band is always capitalized.
         if colors[c] == 'Y':
@@ -284,11 +281,9 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
         for p in range(len(positions)):            # Iterate over all inputted coordinates
             if 'COADD_OBJECT_ID' in df:
                 filenm = outdir + '{0}_{1}.fits'.format(df['COADD_OBJECT_ID'][p], colors[c].lower())
-                out_filenm_cut.append(filenm)
             else:
                 #filenm = outdir + 'x{0}y{1}_{2}.fits'.format(df['RA'][p], df['DEC'][p], colors[c].lower())
                 filenm = outdir + 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p]) + '_{}.fits'.format(colors[c].lower())
-                out_filenm_cut.append(filenm)
 
             newhdul = fits.HDUList()
             pixelscale = None
@@ -344,7 +339,6 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
             newhdul.writeto(filenm, output_verify='exception', overwrite=True, checksum=False)
             newhdul.close()
     logger.info('MakeFitsCut - Tile {} complete.'.format(df['TILENAME'][0]))
-    return tuple(out_filenm_cut)
 
 def MakeStiffRGB(par):
     '''
@@ -361,8 +355,8 @@ def MakeStiffRGB(par):
         Box size in arcmin
     positions: astropy SkyCoord
         Positions in the tile, in celestial coordinates
-    tiff_bands: tuple of str
-        Tuple of bands to be use for combining
+    tiff_bands: list of list of str
+        Set of bands for combine [['Y,r,g'], ['z,r,g'], ['i,r,g']]
     df: dataframe
         Pandas dtaframe of stamp centers and tilename, for the tile we are
         working in
@@ -373,69 +367,91 @@ def MakeStiffRGB(par):
     # Uncompress parameters
     tiledir, outdir, size, positions, tiff_bands, df = par
 
-    # Invert order of tiff_bands, from RGB to BGR
-    tiff_bands = tuple(list(tiff_bands)[::-1])
+    # Check if outdir exists
+    logger = logging.getLogger(__name__)
+    os.makedirs(outdir, exist_ok=True)
 
     # MakeFitsCut already iterates over the tile-dataframe. Take advantage of it
     # Call FITS cut will return groups of band and positions:
     # [(g1,g2), (r1,r2), (z1,z2)]
-    fnm_cut = []
-    for b in tiff_bands:
-        aux_fnm = MakeFitsCut(tiledir, outdir, size, positions, b, df)
-        fnm_cut.append(aux_fnm)
-
-    if (len(fnm_cut[0]) != len(df.index)):
-        t_e = 'Number of positions ({0})'.format(len(fnm_cut[0]))
-        t_e += ' does not match the number of'
-        t_e += ' created stamps ({0})'.format(len(df.index))
-        t_e += ' for tile {0}'.format(df['TILENAME'].unique())
-        logging.error(t_e)
-        sys.exit(1)
+    for band_set in tiff_bands:
+        print('Calling with band set: {0}'.format(band_set))
+        MakeFitsCut(tiledir, outdir, size, positions, band_set.split(','), df)
 
     # Using the same order in the dataframe, create the output name for the
     # RGB combined TIF
-    out_stiff = []
-    aux_c = 0
-    for idx, row in df.iterrows():
-        # TIF naming
-        if 'COADD_OBJECT_ID' in row:
-            outnm = outdir + str(row['COADD_OBJECT_ID'])
-        else:
-            outnm = outdir + 'DESJ' + _DecConverter(row['RA'], row['DEC'])
-        outnm += '.tif'
+    # Iterate over bands, same as LuptonRGB
+    fits_fnm_tile = []
+    for bset in tiff_bands:
+        blist = bset.split(',')
 
-        # Call STIFF using the same order as in the dataframe
-        tmp_rgb = [f[aux_c] for f in fnm_cut]
-        cmd_stiff = 'stiff {0}'.format(' '.join(tmp_rgb))
-        cmd_stiff += ' -OUTFILE_NAME {0}'.format(outnm)
-        cmd_stiff = shlex.split(cmd_stiff)
-        try:
-            subprocess.call(cmd_stiff)
-            print('Written: %s' % outnm)
-        except OSError as e:
-            logging.error(e)
-            raise
+        # Check 3 needed band for combination
+        if (len(blist) != 3):
+            print('3 bands are needed for STIFF RGB image combine.')
+            sys.exit(1)
 
-        # Convert TIF to PNG. Then remove TIF
-        outnm_png = outnm.replace('.tif', '.png')
-        cmd_convert = 'convert {0} {1}'.format(outnm, outnm_png)
-        cmd_convert = shlex.split(cmd_convert)
-        try:
-            subprocess.call(cmd_convert)
-            print('Written: %s' % outnm_png)
-        except OSError as e:
-            logging.error(e)
-            raise
-        out_stiff.append(outnm_png)
-        try:
-            os.remove(outnm)
-        except OSError as e:
-            logging.error(e)
-            raise
+        # Iterate over each requested position
+        for idx, row in df.iterrows():
+            tmp_fits_fnm = [] = []
 
-        aux_c += 1
-    # Returns list of saved TIFF
-    return out_stiff
+            # Get FITS names
+            for b in blist:
+                if 'COADD_OBJECT_ID' in row:
+                    fits_filenm = outdir + '{0}_{1}.fits'.format(
+                        row['COADD_OBJECT_ID'], b.lower()
+                    )
+                    tmp_fits_fnm.append(fits_filenm)
+                else:
+                    fits_filenm = outdir + 'DESJ'
+                    fits_filenm += _DecConverter(row['RA'], row['DEC'])
+                    fits_filenm += '_{0}.fits'.format(b.lower())
+                    tmp_fits_fnm.append(fits_filenm)
+
+            # Checkpoint
+            if (len(tmp_fits_fnm) != 3):
+                print('3 FITS images are needed for STIFF to combine.')
+                sys.exit(1)
+
+            # Call STIFF using the 3 bands. Need to inver the order, from
+            # bluest to reddest
+            if (tmp_fits_fnm[0].rfind('_') > -1):
+                outnm = tmp_fits_fnm[0][:tmp_fits_fnm[0].rfind('_')]
+                outnm += '.tif'
+            else:
+                print('Error in naming of the TIF tmp image')
+                outnm = outnm.replace('fits', 'tif')
+            tmp_fits_fnm = tmp_fits_fnm[::-1]
+            cmd_stiff = 'stiff {0}'.format(' '.join(tmp_fits_fnm))
+            cmd_stiff += ' -OUTFILE_NAME {0}'.format(outnm)
+            cmd_stiff = shlex.split(cmd_stiff)
+            try:
+                subprocess.call(cmd_stiff)
+                print('Written: {0}'.format(outnm))
+            except OSError as e:
+                logging.error(e)
+                raise
+
+            # Convert TIF to PNG. Then remove TIF
+            outnm_png = outnm.replace(
+                '.tif',
+                '_{0}.png'.format(''.join(list(blist)))
+            )
+            cmd_convert = 'convert {0} {1}'.format(outnm, outnm_png)
+            cmd_convert = shlex.split(cmd_convert)
+            try:
+                subprocess.call(cmd_convert)
+                print('Written: {0}'.format(outnm_png))
+            except OSError as e:
+                logging.error(e)
+                raise
+            try:
+                os.remove(outnm)
+            except OSError as e:
+                logging.error(e)
+                raise
+    t_i = 'MakeStiffRGB - Tile {0} complete.'.format(df['TILENAME'].unique())
+    logging.info(t_i)
+    return True
 
 def run(args):
     ''' Method to run the cutouts
@@ -742,7 +758,7 @@ if __name__ == '__main__':
     parser.add_argument('--colors', default='I', type=str.upper, help='Color bands for the fits cutout. Default: i')
     # nargas=3 works with spaces as separator
     # aux_tiff_b = ['z', 'r', 'g']
-    parser.add_argument('--colors_stiff', action='append', metavar='R,G,B', help='Comma-separated bands from which to combine the TIFF image, e.g.: z,r,g')
+    parser.add_argument('--colors_stiff', action='append', metavar='R,G,B', help='Bands from which to combine the TIFF image, e.g.: z,r,g')
 
     parser.add_argument('--rgb_minimum', default=1.0, help='The black point for the 3-color image. Default 1.0')
     parser.add_argument('--rgb_stretch', default=50.0, help='The linear stretch of the image. Default 50.0.')

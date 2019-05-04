@@ -19,7 +19,7 @@ RUN apt-get update -y && \
        gfortran zlibc zlib1g zlib1g-dev tmux gcc libopenmpi-dev bzip2 \
        ca-certificates libhdf5-serial-dev hdf5-tools python3-dev openmpi-bin \
        openmpi-common binutils \
-       libtiff-dev make && \
+       libtiff-dev make imagemagick && \
     apt-get clean && apt-get purge && rm -rf  /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
@@ -42,20 +42,6 @@ RUN wget https://www.astromatic.net/download/stiff/stiff-2.4.0.tar.gz -P /tmp \
     && ./configure \
     && make \
     && make install \
-    && make clean
-
-#FUNPACK
-RUN wget http://heasarc.gsfc.nasa.gov/FTP/software/fitsio/c/cfitsio_latest.tar.gz -P /tmp \
-    && gzip -dc /tmp/cfitsio_latest.tar.gz | tar xvf - -C /tmp/ \
-    && cd /tmp/cfitsio \
-    && ./configure \
-    && make \
-    && make fpack \
-    && make funpack \
-    && chmod a+x fpack \
-    && chmod a+x funpack \
-    && mv fpack /usr/local/bin/ \
-    && mv funpack /usr/local/bin/ \
     && make clean
 
 RUN conda install easyaccess==1.4.7 -c mgckind -c anaconda
