@@ -11,6 +11,8 @@ import datetime
 import logging
 import glob
 import time
+import shlex
+import subprocess
 import easyaccess as ea
 import numpy as np
 import pandas as pd
@@ -338,7 +340,144 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
             newhdul.close()
     logger.info('MakeFitsCut - Tile {} complete.'.format(df['TILENAME'][0]))
 
+def MakeStiffRGB(par):
+    '''
+    Method to create a color image by using STIFF and a combination of 3 bands.
+    The final products will be PNGs, removing TIF images
+    Works on a tile-basis
+    Parameters
+    ----------
+    tiledir: str
+        Path to tile directory
+    outdir: str
+        Path to output files
+    size: astropy Quantity
+        Box size in arcmin
+    positions: astropy SkyCoord
+        Positions in the tile, in celestial coordinates
+    tiff_bands: list of list of str
+        Set of bands for combine [['Y,r,g'], ['z,r,g'], ['i,r,g']]
+    df: dataframe
+        Pandas dtaframe of stamp centers and tilename, for the tile we are
+        working in
+    Returns
+    -------
+    list with saved PNGs
+    '''
+    # Uncompress parameters
+    tiledir, outdir, size, positions, tiff_bands, df = par
+
+    # Check if outdir exists
+    logger = logging.getLogger(__name__)
+    os.makedirs(outdir, exist_ok=True)
+
+    # MakeFitsCut already iterates over the tile-dataframe. Take advantage of it
+    # Call FITS cut will return groups of band and positions:
+    # [(g1,g2), (r1,r2), (z1,z2)]
+    for band_set in tiff_bands:
+        print('Calling with band set: {0}'.format(band_set))
+        MakeFitsCut(tiledir, outdir, size, positions, band_set.split(','), df)
+
+    # Using the same order in the dataframe, create the output name for the
+    # RGB combined TIF
+    # Iterate over bands, same as LuptonRGB
+    fits_fnm_tile = []
+    for bset in tiff_bands:
+        blist = bset.split(',')
+
+        # Check 3 needed band for combination
+        if (len(blist) != 3):
+            print('3 bands are needed for STIFF RGB image combine.')
+            sys.exit(1)
+
+        # Iterate over each requested position
+        for idx, row in df.iterrows():
+            tmp_fits_fnm = [] = []
+
+            # Get FITS names
+            for b in blist:
+                if 'COADD_OBJECT_ID' in row:
+                    fits_filenm = outdir + '{0}_{1}.fits'.format(
+                        row['COADD_OBJECT_ID'], b.lower()
+                    )
+                    tmp_fits_fnm.append(fits_filenm)
+                else:
+                    fits_filenm = outdir + 'DESJ'
+                    fits_filenm += _DecConverter(row['RA'], row['DEC'])
+                    fits_filenm += '_{0}.fits'.format(b.lower())
+                    tmp_fits_fnm.append(fits_filenm)
+
+            # Checkpoint
+            if (len(tmp_fits_fnm) != 3):
+                print('3 FITS images are needed for STIFF to combine.')
+                sys.exit(1)
+
+            # Call STIFF using the 3 bands. Need to inver the order, from
+            # bluest to reddest
+            if (tmp_fits_fnm[0].rfind('_') > -1):
+                outnm = tmp_fits_fnm[0][:tmp_fits_fnm[0].rfind('_')]
+                outnm += '.tif'
+            else:
+                print('Error in naming of the TIF tmp image')
+                outnm = outnm.replace('fits', 'tif')
+            tmp_fits_fnm = tmp_fits_fnm[::-1]
+            cmd_stiff = 'stiff {0}'.format(' '.join(tmp_fits_fnm))
+            cmd_stiff += ' -OUTFILE_NAME {0}'.format(outnm)
+            cmd_stiff = shlex.split(cmd_stiff)
+            try:
+                subprocess.call(cmd_stiff)
+                print('Written: {0}'.format(outnm))
+            except OSError as e:
+                logging.error(e)
+                raise
+
+            # Convert TIF to PNG. Then remove TIF
+            outnm_png = outnm.replace(
+                '.tif',
+                '_{0}.png'.format(''.join(list(blist)))
+            )
+            cmd_convert = 'convert {0} {1}'.format(outnm, outnm_png)
+            cmd_convert = shlex.split(cmd_convert)
+            try:
+                subprocess.call(cmd_convert)
+                print('Written: {0}'.format(outnm_png))
+            except OSError as e:
+                logging.error(e)
+                raise
+            try:
+                os.remove(outnm)
+            except OSError as e:
+                logging.error(e)
+                raise
+    t_i = 'MakeStiffRGB - Tile {0} complete.'.format(df['TILENAME'].unique())
+    logging.info(t_i)
+    return True
+
 def run(args):
+    ''' Method to run the cutouts
+    Parameters
+    ----------
+    coadd: list of str
+    colors: str
+    colors_stiff: list of str
+    csv: str
+    db: str
+    dec: list of floats
+    jobid: str
+    make_fits: boolean
+    make_pngs: boolean
+    make_rgb_stiff: boolean
+    make_rgbs: list of str
+    make_tiffs: boolean
+    outdir: str
+    ra: list of floats
+    return_list: boolean
+    rgb_asinh: float
+    rgb_minimum: float
+    rgb_stretch: float
+    xsize: float (should be int)
+    ysize: float (should be int)
+    '''
     if rank == 0:
         if args.db == 'DR1':
             db = 'desdr'
@@ -536,6 +675,9 @@ def run(args):
         udf = df[ df.TILENAME == i ]
         udf = udf.reset_index()
 
+        #
+        # Note: DECam uses FK5, but not sure which system SWARP uses.
+        #
         size = u.Quantity((ys, xs), u.arcmin)
         positions = SkyCoord(udf['ALPHAWIN_J2000'], udf['DELTAWIN_J2000'], frame='icrs', unit='deg', equinox='J2000', representation_type='spherical')
 
@@ -547,6 +689,11 @@ def run(args):
 
         if args.make_rgbs:
             MakeLuptonRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.make_rgbs, args.rgb_minimum, args.rgb_stretch, args.rgb_asinh)
+
+        if args.make_rgb_stiff:
+            # Working by tilename
+            var = [tiledir, outdir+i+'/', size, positions, args.colors_stiff, udf]
+            MakeStiffRGB(var)
 
     comm.Barrier()
 
@@ -590,6 +737,8 @@ def run(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="This program will make any number of cutouts, using the master tiles.")
 
+    #
+    # Note: Seems that for CSV the TILENAME column is also needed
     parser.add_argument('--csv', type=str, required=False, help='A CSV with columns \'COADD_OBJECT_ID \' or \'RA,DEC\'')
     parser.add_argument('--ra', nargs='*', required=False, type=float, help='RA (decimal degrees)')
     parser.add_argument('--dec', nargs='*', required=False, type=float, help='DEC (decimal degrees)')
@@ -599,11 +748,17 @@ if __name__ == '__main__':
     parser.add_argument('--make_fits', action='store_true', help='Creates FITS files in the desired bands of the cutout region.')
     parser.add_argument('--make_pngs', action='store_true', help='Creates a PNG file of the cutout region.')
     parser.add_argument('--make_rgbs', action='append', type=str.lower, help='Creates 3-color images using the bands you select (reddest to bluest), e.g.: --make_rgbs i,r,g --make_rgbs z,i,r --make_rgbs z,r,g')
+    # Note: MAKE_RGBS should be boolean and use COLORS from the bands, but
+    # modification of other codes would be necessary.
+    parser.add_argument('--make_rgb_stiff', action='store_true', help='Create a TIFF image from the combination of 3 bands. Input desired bands, from reddest to bluest in \'--colors_stiff\' argument')
     parser.add_argument('--return_list', action='store_true', help='Saves list of inputted objects and their matched tiles to user directory.')
 
     parser.add_argument('--xsize', default=1.0, help='Size in arcminutes of the cutout x-axis. Default: 1.0')
     parser.add_argument('--ysize', default=1.0, help='Size in arcminutes of the cutout y-axis. Default: 1.0')
     parser.add_argument('--colors', default='I', type=str.upper, help='Color bands for the fits cutout. Default: i')
+    # nargas=3 works with spaces as separator
+    # aux_tiff_b = ['z', 'r', 'g']
+    parser.add_argument('--colors_stiff', action='append', metavar='R,G,B', help='Bands from which to combine the TIFF image, e.g.: z,r,g')
 
     parser.add_argument('--rgb_minimum', default=1.0, help='The black point for the 3-color image. Default 1.0')
     parser.add_argument('--rgb_stretch', default=50.0, help='The linear stretch of the image. Default 50.0.')
@@ -640,8 +795,11 @@ if __name__ == '__main__':
     if (args.ra and not args.dec) or (args.dec and not args.ra):
         print('Please include BOTH RA and DEC if not using Coadd IDs.')
         sys.exit(1)
-    if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.make_rgbs and not args.return_list:
+    if not args.make_tiffs and not args.make_pngs and not args.make_fits and not args.make_rgbs and not args.make_rgb_stiff and not args.return_list:
         print('Nothing to do. Please select either/both make_tiff and make_fits.')
+        sys.exit(1)
+    if ((args.make_rgb_stiff) and (args.colors_stiff is None)):
+        print('Please include --colors_stiff when calling --make_rgb_stiff creation.')
         sys.exit(1)
 
     run(args)
