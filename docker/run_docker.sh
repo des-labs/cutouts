@@ -1,0 +1,1 @@
+docker run -it -v $PWD/bulkthumbsconfig.yaml:/home/des/cutouts/config/bulkthumbsconfig.yaml -v /Users/fco/Code/des_dataRelease/cutouts/tiles_fits:/tiles -v /Users/fco/Code/des_dataRelease/cutouts/output:/output -v /Users/fco/Code/des_dataRelease/cutouts/bulkthumbs_12.py:/home/des/cutouts/bulkthumbs_12.py cutouts bash
