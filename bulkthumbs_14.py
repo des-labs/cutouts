@@ -163,7 +163,7 @@ def MakeLuptonRGB(tiledir, outdir, df, positions, xs, ys, colors, bp, s, q):
                 file_r = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[0]))
             except IndexError:
                 print('No FITS file in {0} band found for object {1}. Will not create RGB cutout.'.format(c[0], nm))
-                logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not creat RGB cutout.'.format(c[0], nm))
+                logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not create RGB cutout.'.format(c[0], nm))
                 continue
             else:
                 r, header = fits.getdata(file_r[0], 'SCI', header=True)
@@ -172,7 +172,7 @@ def MakeLuptonRGB(tiledir, outdir, df, positions, xs, ys, colors, bp, s, q):
                 file_g = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[1]))
             except IndexError:
                 print('No FITS file in {0} band found for object {1}. Will not create RGB cutout.'.format(c[1], nm))
-                logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not creat RGB cutout.'.format(c[1], nm))
+                logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not create RGB cutout.'.format(c[1], nm))
                 continue
             else:
                 g = fits.getdata(file_g[0], 'SCI')
@@ -180,12 +180,11 @@ def MakeLuptonRGB(tiledir, outdir, df, positions, xs, ys, colors, bp, s, q):
                 file_b = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[2]))
             except IndexError:
                 print('No FITS file in {0} band found for object {1}. Will not create RGB cutout.'.format(c[2], nm))
-                logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not creat RGB cutout.'.format(c[2], nm))
+                logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not create RGB cutout.'.format(c[2], nm))
                 continue
             else:
                 b = fits.getdata(file_b[0], 'SCI')
     
-            #newimg, issmaller = MakeRGB(df, positions[p], xs, ys, r, g, b, w, bp, s, q)
             newimg, issmaller = MakeRGB(df, p, xs, ys, r, g, b, w, bp, s, q)
             newimg.save(filenm, format='PNG')
             
