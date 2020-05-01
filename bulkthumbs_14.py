@@ -395,7 +395,7 @@ def MakeStiffRGB(par):
 
             if c2:        # Call to MakeFitsCut with necessary colors
                 logger.info('MakeStiffRGB  - Some required color band fits files are missing so we will call MakeFitsCut.')
-                MakeFitsCut(tiledir, outdir, size, positions, c, df)
+                MakeFitsCut(tiledir, outdir, size, positions, c2, df)
 
     # Using the same order in the dataframe, create the output name for the
     # RGB combined TIF
@@ -775,6 +775,10 @@ if __name__ == '__main__':
     DR1_UU = conf['dr1_user']['usernm']
     DR1_PP = conf['dr1_user']['passwd']
     
+    #print(args.make_rgbs)
+    #print(len(args.make_rgbs[0].split(',')))
+    #sys.exit(1)
+
     if args.db not in dbs:
         print('Please select a valid database: {}.'.format(dbs))
         sys.exit(1)
