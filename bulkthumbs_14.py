@@ -342,6 +342,125 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
             newhdul.close()
     logger.info('MakeFitsCut - Tile {} complete.'.format(df['TILENAME'][0]))
 
+def MakeStiffRGB(tiledir, outdir, df, positions, xs, ys, colors):
+    '''
+    Method to create a color image by using STIFF and a combination of 3 bands.
+    The final products will be PNGs, removing TIF images
+    Works on a tile-basis
+    Parameters
+    ----------
+    tiledir: str
+        Path to tile directory
+    outdir: str
+        Path to output files
+    size: astropy Quantity
+        Box size in arcmin
+    positions: astropy SkyCoord
+        Positions in the tile, in celestial coordinates
+    tiff_bands: list of list of str
+        Set of bands for combine [['Y,r,g'], ['z,r,g'], ['i,r,g']]
+    df: dataframe
+        Pandas dtaframe of stamp centers and tilename, for the tile we are
+        working in
+    Returns
+    -------
+    list with saved PNGs
+    '''
+    
+    logger = logging.getLogger(__name__)
+
+    # Check if outdir exists
+    os.makedirs(outdir, exist_ok=True)
+
+    # MakeFitsCut already iterates over the tile-dataframe. Take advantage of it
+    # Call FITS cut will return groups of band and positions:
+    # [(g1,g2), (r1,r2), (z1,z2)]
+    for i in colors:
+        print('Calling STIFF with band set: {}'.format(i))
+        c = i.split(',')
+
+        if not os.path.exists(outdir):   # Nothing has been created. No color bands exist.
+            # Call to MakeFitsCut with all colors
+            size = u.Quantity((ys, xs), u.arcmin)
+            MakeFitsCut(tiledir, outdir, size, positions, c, df)
+        else:       # Outdir exists, now check if the right color bands exist.
+            print('outdir exists')
+            c2 = []
+            if not glob.glob(outdir+'*_{}.fits'.format(c[0])):        # Color band doesn't exist
+                c2.append(c[0])            # append color to list to make
+            if not glob.glob(outdir+'*_{}.fits'.format(c[1])):        # Color band doesn't exist
+                c2.append(c[1])            # append color to list to make
+            if not glob.glob(outdir+'*_{}.fits'.format(c[2])):        # Color band doesn't exist
+                c2.append(c[2])            # append color to list to make
+
+            if c2:        # Call to MakeFitsCut with necessary colors
+                logger.info('MakeStiffRGB  - Some required color band fits files are missing so we will call MakeFitsCut.')
+                size = u.Quantity((ys, xs), u.arcmin)
+                MakeFitsCut(tiledir, outdir, size, positions, c2, df)
+
+        # Iterate over each requested position
+        for p in range(len(positions)):
+            if 'COADD_OBJECT_ID' in df:
+                nm = df['COADD_OBJECT_ID'][p]
+                filenm = outdir + '{0}_{1}{2}{3}'.format(nm, c[0], c[1], c[2])
+            else:
+                nm = 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p])
+                filenm = outdir + '{0}_{1}{2}{3}'.format(nm, c[0], c[1], c[2])
+
+# This filenm area is where I'll have to differentiate between Lupton and Stiff. Maybe DESJ2345432_stiff_rgb. The '.png' will have to be moved to later.
+
+
+            try:
+                file_r = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[0]))
+            except IndexError:
+                print('No FITS file in {0} band found for object {1}. Will not create RGB cutout.'.format(c[0], nm))
+                logger.error('MakeStiffRGB - No FITS file in {0} band found for {1}. Will not create RGB cutout.'.format(c[0], nm))
+                continue
+            else:
+                r, header = fits.getdata(file_r[0], 'SCI', header=True)
+                w = WCS(header)
+            try:
+                file_g = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[1]))
+            except IndexError:
+                print('No FITS file in {0} band found for object {1}. Will not create RGB cutout.'.format(c[1], nm))
+                logger.error('MakeStiffRGB - No FITS file in {0} band found for {1}. Will not create RGB cutout.'.format(c[1], nm))
+                continue
+            else:
+                g = fits.getdata(file_g[0], 'SCI')
+            try:
+                file_b = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[2]))
+            except IndexError:
+                print('No FITS file in {0} band found for object {1}. Will not create RGB cutout.'.format(c[2], nm))
+                logger.error('MakeStiffRGB - No FITS file in {0} band found for {1}. Will not create RGB cutout.'.format(c[2], nm))
+                continue
+            else:
+                b = fits.getdata(file_b[0], 'SCI')
+
+            # Call STIFF using the 3 bands.
+            fits_list = [file_r[0], file_g[0], file_b[0]]
+            cmd_stiff = 'stiff {}'.format(' '.join(fits_list))
+            cmd_stiff += ' -OUTFILE_NAME {}'.format(filenm+'.tiff')
+            cmd_stiff = shlex.split(cmd_stiff)
+
+            try:
+                subprocess.call(cmd_stiff)
+            except OSError as e:
+                logger.error(e)
+
+            # Convert the STIFF output from tiff to png and remove the tiff file.
+            cmd_convert = 'convert {0} {1}'.format(filenm+'.tiff', filenm+'.png')
+            cmd_convert = shlex.split(cmd_convert)
+            try:
+                subprocess.call(cmd_convert)
+            except OSError as e:
+                logger.error(e)
+            try:
+                os.remove(filenm+'.tiff')
+            except OSError as e:
+                logger.error(e)
+    logger.info('MakeStiffRGB - Tile {} complete.'.format(df['TILENAME'][0]))
+
+"""
 def MakeStiffRGB(par):
     '''
     Method to create a color image by using STIFF and a combination of 3 bands.
@@ -471,6 +590,7 @@ def MakeStiffRGB(par):
     t_i = 'MakeStiffRGB  - Tile {0} complete.'.format(df['TILENAME'].unique())
     logger.info(t_i)
     return True
+"""
 
 def run(args):
     if rank == 0:
@@ -687,8 +807,9 @@ def run(args):
             MakeLuptonRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.make_rgbs, args.rgb_minimum, args.rgb_stretch, args.rgb_asinh)
 
         if args.make_rgb_stiff:
-            var = [tiledir, outdir+i+'/', size, positions, args.colors_stiff, udf]
-            MakeStiffRGB(var)
+            MakeStiffRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.colors_stiff)
+            #var = [tiledir, outdir+i+'/', size, positions, args.colors_stiff, udf]
+            #MakeStiffRGB(var)
     
     comm.Barrier()
     
