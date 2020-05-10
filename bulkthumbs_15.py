@@ -632,6 +632,9 @@ def run(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="This program will make any number of cutouts, using the master tiles.")
     
+    # Config file
+    parser.add_argument('--config', type=str, required=False, help='Optional file to list all these arguments in and pass it along to bulkthumbs.')
+
     # Object inputs
     parser.add_argument('--csv', type=str, required=False, help='A CSV with columns \'COADD_OBJECT_ID \' or \'RA,DEC\'')
     parser.add_argument('--ra', nargs='*', required=False, type=float, help='RA (decimal degrees)')
@@ -670,6 +673,20 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
+    if args.config:
+        arg_list = []
+        with open(args.config, 'r') as configfile:
+            config = yaml.load(configfile)
+            for key, value in config['inputs'].items():
+                if value is True:
+                    arg_list.append('--{}'.format(key))
+                elif value is False:
+                    continue
+                else:
+                    arg_list.append('--{}'.format(key))
+                    arg_list.append('{}'.format(value))
+        args = parser.parse_args(args=arg_list)
+
     with open('config/bulkthumbsconfig.yaml','r') as cfile:
         conf = yaml.load(cfile)
     TILES_FOLDER = conf['directories']['tiles'] + '/'
