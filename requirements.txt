@@ -1,7 +1,10 @@
-astropy == 3.0.3
-easyaccess == 1.4.3
-mpi4py == 2.0.0
-mpich2 == 1.4.1p1 (should be included when getting mpi4py)
-numpy == 1.13.3
-pandas == 0.21.0 (should work with up-to-date 0.23.4)
-pillow == 5.2.0 (this is the fork of PIL, *not* PIL itself)
+astropy >= 3.0.3
+easyaccess == 1.4.7
+json
+mpi4py >= 3.0.0
+mpich2 == 3.3.2 (should be included when getting mpi4py)
+numpy == 1.18.1
+pandas == 1.0.1
+pillow == 7.0.0 (this is the fork of PIL, *not* PIL itself)
+python >= 3.6
+pyyaml
