@@ -1,0 +1,9 @@
+Cutting from master TIFF
+    vs
+Making 3-color i,r,g from scratch
+
+  			            Cores   Objects  Query (s)  Processing (s)     Total (s)
+make_png                    2      1200       0.52           69.13      1m17.403
+make_rgb                    2      1200       0.43          198.76      3m20.733
+make_png                    6      1200       0.52           75.84      1m24.459
+*These used a sample that had 100 objects per tile, and 12 tiles.

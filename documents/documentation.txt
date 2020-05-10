@@ -1,0 +1,57 @@
+"Bulkthumbs" Technical Details
+
+Author: Landon Gelman, 2018
+*For use by the Dark Eenergy Survey (DES)
+
+This documentation was last updated on: September 27, 2018
+
+Overview:
+	The purpose of this software is to provide a methof for obtaining a very large sample of cutouts from the DES catalog.
+
+Summary of Options:
+	--csv : You can use a csv file containing either COADD_OBJECT_ID's (COI's) or RA/DEC coordinates (RDC's). You can also specify either or both x- and y-sizes for your cutouts on a per object basis in this file.^1 In order to use either COI's or RDC's in your csv file, the header of the file should be formatted as "COADD_OBJECT_ID,XSIZE,YSIZE" or "RA,DEC,XSIZE,YSIZE" (with XSIZE and YSIZE optional to include).^2
+	
+	--ra and --dec : At runtime you can specify a list of space-delimited RDC's. If one is not included and the other is, this will occur in a runtime error informing you to include both lsits.^2
+	
+	--coadd : At runtime you can specify a list of COI's.^2
+	
+	--make_tiffs : Creates a jpeg-compressed TIFF file of the cutout region.
+	
+	--make_pngs : Creates a PNG file of the cutout region.
+	
+	--make_fits : Creates a FITS file of the cutout region. This will include the science image (SCI), mask image (MSK), and weight image (WGT).
+	
+	--xsize and --ysize : Set your global cutout size for all objects. This value will be overridden for individual objects that have x- and/or y-sizes specified in a csv file. The default size is 1x1 arcminutes.
+	
+	--colors : This is to select which color bands from the DES survey (g, r, i, z, Y) you wish to make FITS images in. The default color is the i band. These can be entered as a comma-separated list.
+	
+	--db : Currently you can choose between using the Y3A2 catalog or the DR1 Release catalog. Due to per user permissions limitations with the DR1 database, the job time wil be *significantly* longer when using the DR1 catalog.
+
+Two extra documents will be included with the results of your job: the logfile (a text file) and a summary file (a JSON file). The logfile and summary contain runtime options you selected, user, jobid, any unmatched objects, matching and processing times, and total size on disk. The logfile will also state whether a particular object's cutout is smaller than expected. This is usually because of proximity to a tile's edge. The summary file will contain a list of all objects created (without their extensions to avoid redundancy).
+
+This program is designed to make use of multiple processors with the help of MPI4Py.
+
+Notes:
+	1. Specifying a x- or y-size on an object will overwrite the global x/ysize that you specify. Doing this may slow computation time. My suggestion is if you have a large job but only a few individual objects to make in differing sizes, then you should run those few objects as a separate job.
+
+	2. The program is *not* designed to run with both a list of RDC's and COI's, nor either of those with a csv file at the same time. Please run these as separate jobs if you require both.
+	
+
+
+
+
+MakeLuptonRGB and MakeRGB
+
+This function utilizes Astropy's make_lupton_rgb function (http://docs.astropy.org/en/stable/api/astropy.visualization.make_lupton_rgb.html#astropy.visualization.make_lupton_rgb). It can be used to produces a 3-color RGB image with options for setting stretch and black point. 
+	
+This function ties into the MakeFitsCut function by first checking the output directory for the presence of cutouts for your objects from the MakeFitsCut function. If it does not find any, or does not find the necessary color bands, MakeLuptonRGB will call MakeFitsCut to make the cutouts in the approriate color bands for each object. If the cutouts in the approciate bands do exist already then the function proceeds to build the 3-color image.
+
+The 3-color image is saved in a PNG format.
+
+MakeRGB is actually the function that makes the 3-color image. MakeLuptonRGB handles the file checks and operations.
+
+The command line flag to run this function is `--make_rgb` and the variable it expects is comma-separated list of bands (non-camel case). However, you can pass it multiple sets of color bands as ling as each set is space-separated. E.g., `--make_rgb i,r,g y,z,r z,i,r`.
+
+You can specify the stretch and black point parameters at command line, too. Use the `--rgb_minimum` to set the black point or minimum intensity to be mapped as black (default 1.0), `--rgb_stretch` to set the linear stretch of the image (default 50.0), and `--rgb_asingh` to set the asinh softening parameter (default 10.0).
+
+

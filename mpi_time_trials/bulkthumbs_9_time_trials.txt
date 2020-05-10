@@ -1,0 +1,15 @@
+			         Cores   Objects  Query (s)  Processing (s)     Total (s)
+landon (not docker)      6      1200       0.46           13.73        16.336
+landon (docker)          6      1200       0.48           33.41        36.199
+desrelease               6      1200       0.46           19.46        21.488
+
+landon (not docker)      6     12000       0.76           41.97        44.882
+landon (docker)          6     12000       4.76           52.60       1m4.842
+desrelease               6     12000       0.58           43.62        46.155
+
+landon (not docker)      6    135518      41.52          368.42      6m54.391
+landon (docker)          6    135518      35.01          439.62       8m0.649
+desrelease               6    135518      18.48          340.90      6m22.820
+
+desrelease (just pngs)   6    998020    8508.64        18212.13    453m30.956
+desrelease (pngs, fits)  6    998020      19.60       146376.44   2479m43.143

@@ -1,0 +1,74 @@
+Monday, 07/02/2018
+	From what I understand, Matias has been asked many times to provide a bulk cutout service for use with machine learning projects. This would expect a cutout sample on the order of millions, potentially. Technically, this is doable with the current cutout service from desaccess, but it's terribly inefficient, slow, and the web interface is really only useful on the order of 100 or so images. The idea is to make a second service to better provide a large sample size like this.
+	Matias suggested maybe looking into storing a cutout of every single object in the database. This is on the order of 400 million objects. He thought maybe a large sample of that could be omitted as "bad data" (I'm thinking maybe on a background noise threshold).
+	The current cutout process knows which tile a given coordinate is in, opens the image for that tile, pinpoints the object's coordinates, and makes a cut of a given size around it. I wonder how efficient it would be to sort an inputted list of coordinates into coordinate ranges by tile, so that you only open each tile image once and keep it open until all objects within that tile have been located and cutout. Perhaps we could parallelize/multithread the object search-and-cutout part for each tile image. Another idea is to have job options for selecting between PNG and TIFF or both. One problem is compute time if a job needs to be repeated. 
+	
+	Specs:
+		Total DES objects: ~400,000,000
+		# of Tiles: 10,000
+		Size of Each Tile: 10,000 x 10,000 pixels
+		
+		From .stifflog, the FITS files are 32 bit floating point precision, the TIFFs are 8 bit integer with JPEG compression, and the PNGs are 8 bit.
+		Both the TIFFs and PNGs are created from the FITS, not FITS>TIFF>PNG like I originally thought.
+		
+	
+	File Size Example:
+		Note: the cutout server and My Jobs display file sizes with binary prefixes, e.g., KiB, MiB, GiB, TiB.
+	
+		RA: 10.1415, DEC: -62.0329
+		
+		4' x 4'
+		912p x 912p
+		PNG filesize: 1.7 MiB	*400,000,000 = ~648 TiB
+		TIF filesize: 917 KiB	*400,000,000 = ~341 TiB
+		
+		1' x 1'
+		228p x 228p
+		PNG filesize: 102 KiB	*400,000,000 = ~38 TiB
+		TIF filesize: 52 KiB	*400,000,000 = ~19 TiB
+	
+	Processing Time Example:
+		23 objects
+		1' x 1'
+		PNGs and TIFFs
+		21.77 seconds to complete
+			For 1,000,000 objects, at this rate it would take 10.96 complete days to make all the cutouts with both PNGs and TIFFs
+		
+		Just TIFFs
+		8.79 seconds
+			For 1,000,000 objects, it would take 4.4 complete days to make all the cutouts with just TIFFs
+			
+
+20180705
+	It looks like STIFF is a C program that has probably been installed on the cutout server. I'm still not sure how the cutout server actually works, as there is no similarity between "makeDESthumbs" and "makedescut.py," which also doesn't contain any code for making the TIFF files.
+	Refer to the installing and using sections of the stiff manual.
+	
+	
+	Current cutout service does not refer to the 10k x 10k images. STIFF is used to make color images from the tile FITS and stacks them every time for a job.
+	Goal is to locate the object in a tile, use astropy to find its pixel coords, grab the 3-color image from the tile's TIFF file (this avoids using STIFF), and crop the each tile's bands and TIFF to the arcminute size required around the object of interest.
+	Maybe open each tile per core. Multiple cores, multiple tiles. mpi4py? parsl?
+		Sort list of input coords by tile, so you only have to open each tile once.
+	Each cutout (includes tiff and fits) will could be saved to master archive file path. In code, "try:" opening this filepath to see if it exists and use what's already there if it does, to save time. Use a master sidecar file to check its size, and crop it down instead if you need a smaller size (if what's there is larger than what you need, it's definitely still smaller a tile, so it would still be quicker).
+	Each user will have the=eir own workspace too, but that expires and they may not stick around.
+	Refer to makeDESthumbs here: https://opensource.ncsa.illinois.edu/bitbucket/projects/DESDM/repos/desthumbs/browse
+	Other: how much memory will be available per core/node?
+	
+
+20180709
+	Sort list of inputted RA/DEC by tile.
+	Open tile tiff.
+		Use astropy WCS to convert inputted coordinate pair to pixel coordinates.
+		Convert cutout size (arcminutes; user selectable) to pixel size.
+		Crop/save region around pixel coordinate as tiff and/or png (user selectable) in both user folder and archive.
+		Open fits file for color band (user selectable).
+			Make same crop around coordinate pair 
+			Save as fits, retain header (but adjusted for change in size).
+			Repeat for each selected color band.
+		Repeat for next object.
+
+
+20180710
+	Take in parameters: ID list, xysizes, outdir, color bands, prefix, user & password (?).
+	Sort list of IDs by tile.
+	
+

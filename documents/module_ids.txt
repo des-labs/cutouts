@@ -1,0 +1,29 @@
+BulkThumbs:
+handler
+
+
+DOM MODULE IDs
+
+bullkcutouts            = des-bulk-cutouts
+cutouts (interface)     = des-cutouts
+cutouts (coadds)        = des-coadds
+cutouts (SE)            = des-epochs
+vistools                = des-data-analysis
+example db queries      = des-example-query
+finding chart           = des-finding-chart
+footprint               = des-footprint
+help                    = des-help
+homepage                = des-home
+my jobs page            = des-my-jobs
+db access               = des-query
+results overlay         = des-results
+results (SE) overlay    = des-results-epoch
+table schema            = des-schema
+coadd positions              = des-positions
+SE positions                 = des-positions-epochs
+vistools coadds positions    = des-positions-coadds-da
+vistools coords positions    = des-positions-coords-da
+finding chart positions      = des-positions-fc
+bulkthumbs coadds positions  = des-positions-coadds-bc
+bulkthumbs coords positions  = des-positions-coords-bc
+

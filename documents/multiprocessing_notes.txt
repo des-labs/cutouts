@@ -1,0 +1,48 @@
+get nunique tilenames
+get number of objects per tilename
+
+Might not be able to share image between processes if the CPU resources are divided up amongst multiple nodes.
+Maybe each process will open the image and do its thing.
+
+
+
+Use MPI, it allows for sharing between physical nodes?
+
+Multiprocess it on the objects/positions. 
+Order tilenames by highest number of positions.
+Look at ratio of positions for first to second tiles.
+Divide first tile by that ratio and share tile between processes.
+
+
+20180817:
+	OpenMP is a multi-threading API for use in single node/multiple core systems. Doesn't exist in Python, nor does it make sense for it to because of the GIL.
+	
+	OpenMPI/MPI are useful for multiple node systems connected via a network. They are <i>Message Passing Interfaces</i>.
+	
+	Hybrid use of OpenMP+OpenMPI/MPI exist. If I understand correctly, then this is for fine-tuning a multiple core/multiple node system.
+		This seems really useful if, e.g., each node opened a different tile, and the node's processes worked on the positions for that tile and only that tile.
+	
+	MPI Collective Communications:
+		"Collective communications allow the transmittal of data between multiple processes of a group simultaneously." Basically, this is how you distribute an object from one process (usually root, 0) to all other processes. Unfortunately, this is meant for relatively simple data types, because to distribute these data they must be serialized. AstroPy's HDUObject is not serializable and generates a TypeError.
+			TypeError: cannot serialize '_io.FileIO' object
+			
+	One person on SO suggested trying to decompose the complex data type on the sending side, and reconstituting it on the receiving end. I'm not sure if this is possible within AstroPy.
+	
+	***However, it does appear that an object broadcasted is physically loaded in the memory space for each process, taking up just as much physical memory as if each process opened the file itself. The only advantage hear is less I/O time.***
+	
+	Scatter/Gather seem to be methods for sending chunks of data to separate processes, and with the complexity of a FITS file I don't see these methods' applicability here.
+	
+	I could potentially split up the list of positions per tile and send each split to a different process. This way each process could still open the tile but have more than one position to work on before closing the file.
+	
+	Now for Monday, look into:
+		One-sided communication - aka 'Windows'
+		Parallel I/O
+
+
+Take a look at what parallel I/O means and if it's relevant to this project. It could be that each process will have to open the tile file itself. This could also be beneficial to having the master library of object IDs.
+
+Another thought for the master library, there should be a check each position for each color fits, since not every job necessarily will create all colors.
+
+
+For one object for a tile, maybe then check if it exists, if you have a lot of objects in one tile, then skip checking for it.
+

@@ -1,0 +1,41 @@
+*** Timing MakeLuptonRGB using landon w/o docker ***
+                     Cores  Objects  Query (s)  Processing (s)   Total(s)  Disk (GiB)  Max_Mem (GiB)
+landon (w/o docker)      2     1200       0.49          292.52   4m59.805        2.25          2.387
+landon (w/o docker)      4     1200       0.55          223.92   3m51.077        2.25          4.759
+landon (w/o docker)      6     1200       0.53          251.67   4m16.033        2.25          6.510
+landon (w/o docker)      6    12000       4.58         1559.01  26m11.514       22.52          7.177
+
+
+*** Comparison to just MakeFitsCut using landon w/o docker ***
+                     Cores  Objects  Query (s)  Processing (s)   Total(s)  Disk (GiB)  Max_Mem (GiB)
+MakeLuptonRGB            1        1       0.42           11.10     12.983
+MakeLuptonRGB            1        1       0.52           11.43     13.371
+MakeLuptonRGB            1        1       0.44           10.58     12.411
+
+MakeFitsCut              2     1200       0.54          240.41    4m2.717        2.19          2.403
+MakeLuptonRGB            2     1200       0.47          268.56   4m30.568        2.25          2.387
+                                                   delta 20.15
+                                                   
+MakeFitsCut              4     1200       0.46          222.93   3m47.027        2.19          4.759
+MakeLuptonRGB            4     1200       0.55          245.97   4m12.707        2.25          4.402
+                                                   delta 23.04
+
+MakeFitsCut              6     1200       0.50          223.76   3m50.535        2.19          7.146
+MakeLuptonRGB            6     1200       0.51          270.67   4m35.213        2.25          6.991
+                                                   delta 46.91
+
+MakeFitsCut              6    12000       0.81          851.25  14m19.807       21.91          7.177
+MakeLuptonRGB            6    12000       0.81         1359.38  22m48.654       22.52          7.192
+                                                  delta 508.13
+
+*** From bulkthumbs_10 trial ***
+*** this was when it opened up the entire tile ***
+                     Cores  Objects  Query (s)  Processing (s)   Total(s)
+MakeLuptonRGB            2     1200       0.43          198.76   3m20.733
+
+
+*** Comparison of MakeTiffCut (PNG) and MakeLuptonRGB ***
+                     Cores  Objects  Query (s)  Processing (s)   Total(s)  Disk (GiB)  Max_Mem (GiB)
+MakeTiffCut (PNG)        2     1200       0.43           29.30     31.414        0.15          0.899
+MakeTiffCut (PNG)        4     1200       0.45           15.19     17.297        0.15          1.752
+MakeTiffCut (PNG)        6     1200       0.56           13.16     15.847        0.15          2.682
