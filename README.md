@@ -27,8 +27,9 @@ usage: bulkthumbs_15.py [-h] [--config CONFIG] [--csv CSV]
                         [--ysize YSIZE] [--colors_fits COLORS_FITS]
                         [--colors_rgb R,G,B] [--rgb_minimum RGB_MINIMUM]
                         [--rgb_stretch RGB_STRETCH] [--rgb_asinh RGB_ASINH]
-                        [--db DB] [--jobid JOBID] [--usernm USERNM]
-                        [--passwd PASSWD] [--outdir OUTDIR]
+                        [--db DB] [--release RELEASE] [--jobid JOBID]
+                        [--usernm USERNM] [--passwd PASSWD]
+                        [--tiledir TILEDIR] [--outdir OUTDIR]
 
 This program will make any number of cutouts, using the master tiles.
 
@@ -68,13 +69,16 @@ optional arguments:
                         The linear stretch of the image. Default 50.0.
   --rgb_asinh RGB_ASINH
                         The asinh softening parameter. Default 10.0
-  --db DB               Which database to use. Default: Y3A2, Options: DR1,
-                        Y3A2.
+  --db DB               Which database to use. Default: DESSCI, Options:
+                        DESDR, DESSCI.
+  --release RELEASE     Which data release to use. Default: Y6A1. Options:
+                        Y6A1, Y3A2, Y3A1, SVA1.
   --jobid JOBID         Option to manually specify a jobid for this job.
   --usernm USERNM       Username for database; otherwise uses values from
                         desservices file.
   --passwd PASSWD       Password for database; otherwise uses values from
                         desservices file.
+  --tiledir TILEDIR     Directory where tiles are stored.
   --outdir OUTDIR       Overwrite for output directory.
 ```
 ### Example using a CSV:
