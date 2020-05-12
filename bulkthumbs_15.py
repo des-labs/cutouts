@@ -35,12 +35,13 @@ from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = 144000000        # allows Pillow to not freak out at a large filesize
 ARCMIN_TO_DEG = 0.0166667        # deg per arcmin
-dbs = ['DR1','Y3A2']
+dbs = ['DESDR','DESSCI']
+releases = ['DR1','Y6A1','Y3A2','Y3A1','SVA1']
 
 TILES_FOLDER = ''
 OUTDIR = ''
-DR1_UU = ''
-DR1_PP = ''
+#DR1_UU = ''
+#DR1_PP = ''
 
 comm = mpi.COMM_WORLD
 nprocs = comm.Get_size()
@@ -375,15 +376,15 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
 
 def run(args):
     if rank == 0:
-        if args.db == 'DR1':
+        if args.db == 'DESDR':
             db = 'desdr'
-            uu = DR1_UU
-            pp = DR1_PP
+            uu = args.usernm    #DR1_UU
+            pp = args.passwd    #DR1_PP
             conn = ea.connect(db, user=uu, passwd=pp)
-        elif args.db == 'Y3A2':
+        elif args.db == 'DESSCI':
             db = 'dessci'
             conn = ea.connect(db)
-        
+
         curs = conn.cursor()
         
         usernm = str(conn.user)
@@ -497,9 +498,9 @@ def run(args):
                 query += ", temp.XSIZE"
             if 'YSIZE' in userdf:
                 query += ", temp.YSIZE"
-            if args.db == 'Y3A2':
+            if args.db == 'DESSCI':
                 catalog = 'Y3A2_COADDTILE_GEOM'
-            elif args.db == 'DR1':
+            elif args.db == 'DESDR':
                 catalog = 'DR1_Tile_INFO'
             query += " from {0} temp left outer join {1} m on (m.CROSSRA0='N' and (temp.RA between m.URAMIN and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX)) or (m.CROSSRA0='Y' and (temp.RA_ADJUSTED between m.URAMIN-360 and m.URAMAX) and (temp.DEC between m.UDECMIN and m.UDECMAX))".format(tablename, catalog)
             
@@ -529,9 +530,9 @@ def run(args):
                 query += ", temp.XSIZE"
             if 'YSIZE' in userdf:
                 query += ", temp.YSIZE"
-            if args.db == 'Y3A2':
+            if args.db == 'DESSCI':
                 catalog = 'Y3A2_COADD_OBJECT_SUMMARY'
-            elif args.db == 'DR1':
+            elif args.db == 'DESDR':
                 catalog = 'DR1_MAIN'
             query += " from {0} temp left outer join {1} m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename, catalog)
             
@@ -661,10 +662,12 @@ if __name__ == '__main__':
     parser.add_argument('--rgb_asinh', default=10.0, help='The asinh softening parameter. Default 10.0')
     
     # Database access and Bookkeeping
-    parser.add_argument('--db', default='Y3A2', type=str.upper, required=False, help='Which database to use. Default: Y3A2, Options: DR1, Y3A2.')
+    parser.add_argument('--db', default='DESSCI', type=str.upper, required=False, help='Which database to use. Default: DESSCI, Options: DESDR, DESSCI.')
+    parser.add_argument('--release', default='Y6A1', type=str.upper, required=False, help='Which data release to use. Default: Y6A1. Options: Y6A1, Y3A2, Y3A1, SVA1.')
     parser.add_argument('--jobid', required=False, help='Option to manually specify a jobid for this job.')
     parser.add_argument('--usernm', required=False, help='Username for database; otherwise uses values from desservices file.')
     parser.add_argument('--passwd', required=False, help='Password for database; otherwise uses values from desservices file.')
+    parser.add_argument('--tiledir', required=False, help='Directory where tiles are stored.')
     parser.add_argument('--outdir', required=False, help='Overwrite for output directory.')
     
     if len(sys.argv) == 1:
@@ -687,18 +690,36 @@ if __name__ == '__main__':
                     arg_list.append('{}'.format(value))
         args = parser.parse_args(args=arg_list)
 
-    with open('config/bulkthumbsconfig.yaml','r') as cfile:
-        conf = yaml.load(cfile)
-    TILES_FOLDER = conf['directories']['tiles'] + '/'
+    if args.tiledir:
+        TILES_FOLDER = args.tiledir
+
     if args.outdir:
         OUTDIR = args.outdir
-    else:
-        OUTDIR = conf['directories']['outdir'] + '/'
-    DR1_UU = conf['dr1_user']['usernm']
-    DR1_PP = conf['dr1_user']['passwd']
+
+    if not TILES_FOLDER or not OUTDIR:
+        try:
+            with open('config/bulkthumbsconfig.yaml','r') as cfile:
+                conf = yaml.load(cfile)
+            
+            if not TILES_FOLDER:
+                TILES_FOLDER = conf['directories']['tiles'] + '/'
+            if not OUTDIR:
+                OUTDIR = conf['directories']['outdir'] + '/'
+        except FileNotFoundError:
+            print('Bulkthumbs config file not found. Either no --tiledir or no --outdir set.')
+            sys.exit(1)
+    
+    #DR1_UU = conf['dr1_user']['usernm']
+    #DR1_PP = conf['dr1_user']['passwd']
 
     if args.db not in dbs:
         print('Please select a valid database: {}.'.format(dbs))
+        sys.exit(1)
+    if args.db == 'DR1' and not (args.usernm and args.passwd):
+        print('Please include the --usernm and --passwd to use the DR1 database.')
+        sys.exit(1)
+    if args.release not in releases:
+        print('Please select a valid data release: {}.'.format(releases))
         sys.exit(1)
     if not args.csv and not (args.ra and args.dec) and not args.coadd:
         print('Please include either RA/DEC coordinates or Coadd IDs.')
