@@ -737,6 +737,12 @@ if __name__ == '__main__':
         print('Please include --colors_rgb when calling --make_rgb_stiff or --make_rgb_lupton')
         sys.exit(1)
 
-    # We don't need a catch for not including args.colors_fits because we included a default value, i band, in the argument declaration.
+    # We don't need a catch for not including args.colors_fits because we 
+    # included a default value, i band, in the argument declaration.
+    #
+    # We don't need a catch for including colors_rgb and not make_rgb_stiff or 
+    # make_rgb_lupton because args.colors_rgb won't be accessed without those 
+    # other args. Plus, the log won't list these colors either without the other
+    # args present.
     
     run(args)
