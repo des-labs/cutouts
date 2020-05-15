@@ -653,7 +653,7 @@ if __name__ == '__main__':
     # Parameters
     parser.add_argument('--xsize', default=1.0, help='Size in arcminutes of the cutout x-axis. Default: 1.0')
     parser.add_argument('--ysize', default=1.0, help='Size in arcminutes of the cutout y-axis. Default: 1.0')
-    parser.add_argument('--colors_fits', default='I', type=str.upper, help='Color bands for the fits cutout. Default: i')
+    parser.add_argument('--colors_fits', default='I', type=str.upper, help='Color bands for the fits cutout, e.g.: g,r,i,z,y. Default: i')
     parser.add_argument('--colors_rgb', action='append', type=str.lower, metavar='R,G,B', help='Bands from which to combine the the RGB image, e.g.: z,r,g. Call multiple times for multiple colors combinations, e.g.: --colors_rgb z,r,g --colors_rgb z,i,r.')
 
     # Lupton RGB Parameters
