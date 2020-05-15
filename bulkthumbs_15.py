@@ -686,8 +686,13 @@ if __name__ == '__main__':
                 elif value is False:
                     continue
                 else:
-                    arg_list.append('--{}'.format(key))
-                    arg_list.append('{}'.format(value))
+                    if key == 'colors_rgb':         # need colors_rgb to be in format ['g,r,i','y,r,g',etc.]
+                        for i in value.split(' '):
+                            arg_list.append('--{}'.format(key))
+                            arg_list.append('{}'.format(i))
+                    else:
+                        arg_list.append('--{}'.format(key))
+                        arg_list.append('{}'.format(value))
         args = parser.parse_args(args=arg_list)
 
     if args.tiledir:
