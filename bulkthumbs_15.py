@@ -18,9 +18,10 @@ import pandas as pd
 import PIL
 import uuid
 import json
-import yaml
+import re
 import shlex
 import subprocess
+import yaml
 from astropy import units as u
 from astropy.io import fits
 from astropy.nddata import Cutout2D
@@ -425,7 +426,18 @@ def run(args):
     
     xs = float(args.xsize)
     ys = float(args.ysize)
-    colors = args.colors_fits.split(',')
+
+    # This catches things like 'GG,R,I' and 'G,G,R,I' and 'GG,R,ZI'
+    # and converts them to 'G,R,I' or 'G,R,I,Z'
+    colors_fits = list(set(re.sub('[^GRIZY]', '', args.colors_fits)))  # colors = args.colors_fits.split(',')
+
+    # This catches things like ['yy,g,r','y,ri']
+    # and converts them to ['y,g,r','y,r,i']
+    if args.colors_rgb:
+        colors_rgb = []
+        for i in args.colors_rgb:
+            rgb_set = (',').join(set(re.sub('[^grizy]', '', i)))
+            colors_rgb.append(rgb_set)
     
     if rank == 0:
         summary = {}
@@ -469,11 +481,11 @@ def run(args):
         summary['make_rgb_lupton'] = 'True' if args.make_rgb_lupton else 'False'
         summary['make_rgb_stiff'] = 'True' if args.make_rgb_stiff else 'False'
         if args.make_fits:
-            logger.info('        Bands (fits): '+args.colors_fits)
-            summary['bands_fits'] = args.colors_fits
+            logger.info('        Bands (fits): '+str(colors_fits))
+            summary['bands_fits'] = colors_fits
         if args.make_rgb_lupton or args.make_rgb_stiff:
-            logger.info('        Bands (rgb): '+str(args.colors_rgb))
-            summary['bands_rgb'] = args.colors_rgb
+            logger.info('        Bands (rgb): '+str(colors_rgb))
+            summary['bands_rgb'] = colors_rgb
         summary['db'] = args.db
         
         df = pd.DataFrame()
@@ -585,11 +597,11 @@ def run(args):
             MakeTiffCut(tiledir, outdir+i+'/', positions, xs, ys, udf, args.make_tiffs, args.make_pngs)
         
         if args.make_fits:
-            MakeFitsCut(tiledir, outdir+i+'/', size, positions, colors, udf)
+            MakeFitsCut(tiledir, outdir+i+'/', size, positions, colors_fits, udf)
         
         if args.make_rgb_lupton or args.make_rgb_stiff:
             luptonargs = [args.rgb_minimum, args.rgb_stretch, args.rgb_asinh]
-            MakeRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, args.colors_rgb, args.make_rgb_stiff, args.make_rgb_lupton, luptonargs)
+            MakeRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, colors_rgb, args.make_rgb_stiff, args.make_rgb_lupton, luptonargs)
     
     comm.Barrier()
     
@@ -740,6 +752,24 @@ if __name__ == '__main__':
         sys.exit(1)
     if (args.make_rgb_stiff or args.make_rgb_lupton) and not args.colors_rgb:
         print('Please include --colors_rgb when calling --make_rgb_stiff or --make_rgb_lupton')
+        sys.exit(1)
+
+    if args.colors_rgb:
+        for i in args.colors_rgb:
+            # This catches things like ['y,a,r','i,t,g']
+            if re.search('[^grizy]', i.replace(',','')):
+                print('Please include only DES color bands.')
+                sys.exit(1)
+
+            # This catches things like ['y,z,i,r','y,z','yy,gi,r','y,z,z']
+            # but allows things like ['y,ri'] -- > 'yri' and ['yy,g,r'] --> 'ygr'
+            if len(set(re.sub('[^grizy]','',i))) != 3:
+                print('Please ensure each set of colors for colors_rgb has (only) 3 colors.')
+                sys.exit(1)
+
+    # This will catch things like 'G,R,A,R'
+    if re.search('[^GRIZY]', args.colors_fits.replace(',','')):
+        print('Please include only DES color bands.')
         sys.exit(1)
 
     # We don't need a catch for not including args.colors_fits because we 
