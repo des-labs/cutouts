@@ -707,7 +707,7 @@ if __name__ == '__main__':
                     continue
                 else:
                     if key == 'colors_rgb':         # need colors_rgb to be in format ['g,r,i','y,r,g',etc.]
-                        for i in value.split(' '):
+                        for i in value:
                             arg_list.append('--{}'.format(key))
                             arg_list.append('{}'.format(i))
                     else:
