@@ -435,9 +435,17 @@ def run(args):
     # and converts them to ['y,g,r','y,r,i']
     if args.colors_rgb:
         colors_rgb = []
+        colors_rgb_unsorted = []
         for i in args.colors_rgb:
             rgb_set = (',').join(set(re.sub('[^grizy]', '', i)))
-            colors_rgb.append(rgb_set)
+            colors_rgb_unsorted.append(rgb_set)
+        for unsorted_string in colors_rgb_unsorted:
+            rgbtemp = []
+            for color in list('yzirg'):
+                if color in unsorted_string:
+                    rgbtemp.append(color)
+            rgb_string = (',').join(rgbtemp)
+            colors_rgb.append(rgb_string)
     
     if rank == 0:
         summary = {}
