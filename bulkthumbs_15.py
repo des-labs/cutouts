@@ -37,7 +37,7 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = 144000000        # allows Pillow to not freak out at a large filesize
 ARCMIN_TO_DEG = 0.0166667        # deg per arcmin
 dbs = ['DESDR','DESSCI']
-releases = ['DR1','Y6A1','Y3A2','Y3A1','SVA1']
+releases = ['DR1','Y6A1','Y3A2','Y1A1','SVA1']
 
 TILES_FOLDER = ''
 OUTDIR = ''
@@ -544,6 +544,8 @@ def run(args):
             userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
             conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
             
+            idColumn = ''
+
             #query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME from {} temp left outer join Y3A2_COADD_OBJECT_SUMMARY m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename)
             query = "select temp.COADD_OBJECT_ID, m.ALPHAWIN_J2000, m.DELTAWIN_J2000, m.RA, m.DEC, m.TILENAME"
             if 'XSIZE' in userdf:
@@ -551,10 +553,22 @@ def run(args):
             if 'YSIZE' in userdf:
                 query += ", temp.YSIZE"
             if args.db == 'DESSCI':
-                catalog = 'Y3A2_COADD_OBJECT_SUMMARY'
+                if args.release == 'Y6A1':
+                    catalog = 'Y6A1_COADD_OBJECT_SUMMARY'
+                    idColumn = 'COADD_OBJECT_ID'
+                if args.release == 'Y3A2':
+                    catalog = 'Y3A2_COADD_OBJECT_SUMMARY'
+                    idColumn = 'COADD_OBJECT_ID'
+                if args.release == 'Y1A1':
+                    catalog = 'Y1A1_COADD_OBJECTS'
+                    idColumn = 'COADD_OBJECTS_ID'
+                if args.release == 'SVA1':
+                    catalog = 'SVA1_COADD_OBJECTS'
+                    idColumn = 'COADD_OBJECTS_ID'
             elif args.db == 'DESDR':
                 catalog = 'DR1_MAIN'
-            query += " from {0} temp left outer join {1} m on temp.COADD_OBJECT_ID=m.COADD_OBJECT_ID".format(tablename, catalog)
+                idColumn = 'COADD_OBJECT_ID'
+            query += " from {0} temp left outer join {1} m on temp.COADD_OBJECT_ID=m.{2}".format(tablename, catalog, idColumn)
             
             df = conn.query_to_pandas(query)
             curs.execute('drop table {}'.format(tablename))
@@ -683,7 +697,7 @@ if __name__ == '__main__':
     
     # Database access and Bookkeeping
     parser.add_argument('--db', default='DESSCI', type=str.upper, required=False, help='Which database to use. Default: DESSCI, Options: DESDR, DESSCI.')
-    parser.add_argument('--release', default='Y6A1', type=str.upper, required=False, help='Which data release to use. Default: Y6A1. Options: Y6A1, Y3A2, Y3A1, SVA1.')
+    parser.add_argument('--release', default='Y6A1', type=str.upper, required=False, help='Which data release to use. Default: Y6A1. Options: Y6A1, Y3A2, Y1A1, SVA1.')
     parser.add_argument('--jobid', required=False, help='Option to manually specify a jobid for this job.')
     parser.add_argument('--usernm', required=False, help='Username for database; otherwise uses values from desservices file.')
     parser.add_argument('--passwd', required=False, help='Password for database; otherwise uses values from desservices file.')
