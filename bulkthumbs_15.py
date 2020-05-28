@@ -195,7 +195,6 @@ def MakeRGB(tiledir, outdir, df, positions, xs, ys, colors, makestiff, makelupto
 
                 if issmaller:
                     logger.info('MakeLuptonRGB - {} is smaller than user requested. This is likely because the object/coordinate was in close proximity to the edge of a tile.'.format(('/').join(luptonnm.split('/')[-2:])))
-                    print(('/').join(filenm.split('/')[-2:]))
 
             if makestiff:
                 stiffnm = filenm + '_stiff'
@@ -632,8 +631,6 @@ def run(args):
                 if args.release in ('SVA1', 'Y1A1'):
                     tiledir = tiledir.replace('https://desar2.cosmology.illinois.edu/DESFiles/desardata/OPS/coadd/', '/des004/coadd/') + '/'
             logger.info('Using DB and table {} to determine tile paths...'.format(table_path))
-
-        print(tiledir)
 
             # TODO: Add code to download the needed tiles from the servers if TILES_FOLDER is empty, using the desar2 URLs.
 
