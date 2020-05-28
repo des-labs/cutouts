@@ -609,9 +609,34 @@ def run(args):
     
     df = comm.scatter(df, root=0)
     
+    # Get the tile paths from Matias' tables.
+    if not TILES_FOLDER or TILES_FOLDER == 'DESLABS-TILES':
+        if not args.usernm or not args.passwd:
+            conn_tiles = ea.connect('dessci')       # Assume .desservices file exists on local computer.
+        else:
+            conn_tiles = ea.connect('dessci', user=args.usernm, passwd=args.passwd)
+        qtemplate = "select FITS_IMAGES from {} where tilename = '{}'and band = 'i'"
+        table_path = "MCARRAS2.{}_TILE_PATH_INFO".format(args.release)
+
     tilenm = df['TILENAME'].unique()
     for i in tilenm:
         tiledir = TILES_FOLDER + i + '/'
+        
+        if not TILES_FOLDER or TILES_FOLDER == 'DESLABS-TILES':
+            dftile = conn_tiles.query_to_pandas(qtemplate.format(table_path, i))
+            tiledir = os.path.dirname(dftile.FITS_IMAGES.iloc[0])       # Replace tiledir with path from Matias' table
+            # When running on deslabs, change the file paths to internal directories.
+            if TILES_FOLDER == 'DESLABS-TILES':
+                if args.release in ('Y6A1','Y3A2'):
+                    tiledir = tiledir.replace('https://desar2.cosmology.illinois.edu/DESFiles/desarchive/OPS/', '/des003/desarchive/') + '/'
+                if args.release in ('SVA1', 'Y1A1'):
+                    tiledir = tiledir.replace('https://desar2.cosmology.illinois.edu/DESFiles/desardata/OPS/coadd/', '/des004/coadd/') + '/'
+            logger.info('Using DB and table {} to determine tile paths...'.format(table_path))
+
+        print(tiledir)
+
+            # TODO: Add code to download the needed tiles from the servers if TILES_FOLDER is empty, using the desar2 URLs.
+
         udf = df[ df.TILENAME == i ]
         udf = udf.reset_index()
         
@@ -628,6 +653,9 @@ def run(args):
             luptonargs = [args.rgb_minimum, args.rgb_stretch, args.rgb_asinh]
             MakeRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, colors_rgb, args.make_rgb_stiff, args.make_rgb_lupton, luptonargs)
     
+    if not TILES_FOLDER or TILES_FOLDER == 'DESLABS-TILES':
+        conn_tiles.close()
+
     comm.Barrier()
     
     if rank == 0:
@@ -742,6 +770,7 @@ if __name__ == '__main__':
     if args.outdir:
         OUTDIR = args.outdir
 
+    """
     if not TILES_FOLDER or not OUTDIR:
         try:
             with open('config/bulkthumbsconfig.yaml','r') as cfile:
@@ -754,7 +783,8 @@ if __name__ == '__main__':
         except FileNotFoundError:
             print('Bulkthumbs config file not found. Either no --tiledir or no --outdir set.')
             sys.exit(1)
-    
+    """
+
     #DR1_UU = conf['dr1_user']['usernm']
     #DR1_PP = conf['dr1_user']['passwd']
 
