@@ -384,7 +384,10 @@ def run(args):
             conn = ea.connect(db, user=uu, passwd=pp)
         elif args.db == 'DESSCI':
             db = 'dessci'
-            conn = ea.connect(db)
+            if not args.usernm or not args.passwd:
+                conn = ea.connect(db)       # Assume .desservices file exists on local computer.
+            else:
+                conn = ea.connect(db, user=args.usernm, passwd=args.passwd)
 
         curs = conn.cursor()
         
