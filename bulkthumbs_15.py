@@ -724,6 +724,10 @@ if __name__ == '__main__':
                         for i in value:
                             arg_list.append('--{}'.format(key))
                             arg_list.append('{}'.format(i))
+                    elif key == 'coadd' or key == 'ra' or key == 'dec':
+                        arg_list.append('--{}'.format(key))
+                        for i in value:
+                            arg_list.append('{}'.format(i))
                     else:
                         arg_list.append('--{}'.format(key))
                         arg_list.append('{}'.format(value))
@@ -801,5 +805,5 @@ if __name__ == '__main__':
     # make_rgb_lupton because args.colors_rgb won't be accessed without those 
     # other args. Plus, the log won't list these colors either without the other
     # args present.
-    
+
     run(args)
