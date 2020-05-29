@@ -396,7 +396,7 @@ def run(args):
         else:
             jobid = str(uuid.uuid4())
         
-        outdir = OUTDIR + usernm + '/' + jobid + '/'        # use for local
+        outdir = os.path.join(OUTDIR, usernm, jobid) + '/'        # use for local
         #outdir = OUTDIR        # use for desaccess
         
         # Remove this try/except block for desaccess. Keep for local.
