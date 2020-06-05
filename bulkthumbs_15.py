@@ -154,11 +154,11 @@ def MakeRGB(tiledir, outdir, df, positions, xs, ys, colors, makestiff, makelupto
 
         # Iterate over each requested position
         for p in range(len(positions)):
-            if 'COADD_OBJECT_ID' in df:
-                nm = df['COADD_OBJECT_ID'][p]
+            if 'RA' in df:
+                nm = 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p])
                 filenm = outdir + '{0}_{1}{2}{3}'.format(nm, c[0], c[1], c[2])
             else:
-                nm = 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p])
+                nm = df['COADD_OBJECT_ID'][p]
                 filenm = outdir + '{0}_{1}{2}{3}'.format(nm, c[0], c[1], c[2])
 
             try:
@@ -264,11 +264,11 @@ def MakeTiffCut(tiledir, outdir, positions, xs, ys, df, maketiff, makepngs):
     pixcoords = utils.skycoord_to_pixel(positions, w, origin=0, mode='wcs')
     
     for i in range(len(positions)):
-        if 'COADD_OBJECT_ID' in df:
-            filenm = outdir + str(df['COADD_OBJECT_ID'][i])
-        else:
+        if 'RA' in df:
             #filenm = outdir + 'x{0}y{1}'.format(df['RA'][i], df['DEC'][i])     # for test purposes
             filenm = outdir + 'DESJ' + _DecConverter(df['RA'][i], df['DEC'][i])
+        else:
+            filenm = outdir + str(df['COADD_OBJECT_ID'][i])
         
         if 'XSIZE' in df and not np.isnan(df['XSIZE'][i]):
             udx = int(0.5 * df['XSIZE'][i] * ARCMIN_TO_DEG / pixelscale[0])
@@ -313,12 +313,12 @@ def MakeFitsCut(tiledir, outdir, size, positions, colors, df):
             continue        # Just go on to the next color in the list
         
         for p in range(len(positions)):            # Iterate over all inputted coordinates
-            if 'COADD_OBJECT_ID' in df:
-                filenm = outdir + '{0}_{1}.fits'.format(df['COADD_OBJECT_ID'][p], colors[c].lower())
-            else:
+            if 'RA' in df:
                 #filenm = outdir + 'x{0}y{1}_{2}.fits'.format(df['RA'][p], df['DEC'][p], colors[c].lower())
                 filenm = outdir + 'DESJ' + _DecConverter(df['RA'][p], df['DEC'][p]) + '_{}.fits'.format(colors[c].lower())
-            
+            else:
+                 filenm = outdir + '{0}_{1}.fits'.format(df['COADD_OBJECT_ID'][p], colors[c].lower())   
+
             newhdul = fits.HDUList()
             pixelscale = None
             
@@ -460,6 +460,34 @@ def run(args):
             userdf = pd.DataFrame(pd.read_csv(args.csv))
             logger.info('    CSV: '+args.csv)
             summary['csv'] = args.csv
+            if 'RA' in userdf or 'DEC' in userdf:
+                logger.info('    CSV: using RA/DEC')
+                # Check if both columns are there.
+                if ('RA' in userdf and not 'DEC' in userdf) or (not 'RA' in userdf and 'DEC' in userdf):
+                    logger.error('    CSV: using RA/DEC but one of the columns is missing!')
+                    print('CSV: using RA/DEC but one of the columns is missing!')
+                    sys.exit(1)
+                # Check if both columns have the same number of values.
+                if len(userdf['RA']) != len(userdf['DEC']):
+                    logger.error('    CSV: RA and DEC column lengths do not match.')
+                    print('CSV: RA and DEC column lengths do not match.')
+                    sys.exit(1)
+                # Remove missing values that were converted to NaNs when read in by Pandas.
+                missingra = userdf[ (userdf['RA'].isnull()) ]
+                missingdec = userdf[ (userdf['DEC'].isnull()) ]
+                missingcoords = missingra.merge(missingdec, how='outer')
+                if len(missingcoords) > 0:
+                    userdf = userdf.dropna(axis=0, how='any', subset=['RA','DEC']).reset_index(drop=True)
+                    logger.info('Some RA or DEC values are missing. Skipping these rows:\n'+missingcoords)
+                    print('Some RA or DEC values are missing. Skipping these rows:\n'+missingcoords)
+            elif 'COADDID' in userdf:
+                logger.info('    CSV: using COADDID')
+                # Remove missing values that were converted to NaNs when read in by Pandas.
+                missingcoadds = userdf[ (userdf['COADDID'].isnull()) ]
+                if len(missingcoadds) > 0:
+                    userdf = userdf.dropna(axis=0, how='any', subset=['COADDID']).reset_index(drop=True)
+                    logger.info('Some COADD ID values are missing. Skipping these rows:\n'+missingcoadds)
+                    print('Some COADD ID values are missing. Skipping these rows:\n'+missingcoadds)
         elif args.ra:
             coords = {}
             coords['RA'] = args.ra
@@ -542,7 +570,7 @@ def run(args):
             summary['Unmatched_Coords'] = unmatched_coords
             print(unmatched_coords)
         
-        if 'COADD_OBJECT_ID' in userdf:
+        elif 'COADD_OBJECT_ID' in userdf:
             userdf.to_csv(OUTDIR+tablename+'.csv', index=False)
             conn.load_table(OUTDIR+tablename+'.csv', name=tablename)
             
@@ -835,5 +863,9 @@ if __name__ == '__main__':
     # make_rgb_lupton because args.colors_rgb won't be accessed without those 
     # other args. Plus, the log won't list these colors either without the other
     # args present.
+    #
+    # If someone tries to use --csv and any of --coadd, --ra, --dec, only the 
+    # --csv will be taken into userdf. Similarly, if someone uses --coadd and
+    # --ra --dec, the ra/dec will be taken over the coadd.
 
     run(args)
