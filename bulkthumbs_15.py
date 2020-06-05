@@ -635,7 +635,7 @@ def run(args):
             # TODO: Add code to download the needed tiles from the servers if TILES_FOLDER is empty, using the desar2 URLs.
 
         udf = df[ df.TILENAME == i ]
-        udf = udf.reset_index()
+        udf = udf.reset_index(drop=True)
         
         size = u.Quantity((ys, xs), u.arcmin)
         positions = SkyCoord(udf['ALPHAWIN_J2000'], udf['DELTAWIN_J2000'], frame='icrs', unit='deg', equinox='J2000', representation_type='spherical')
