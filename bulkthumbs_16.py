@@ -651,8 +651,15 @@ def run(args):
     for i in tilenm:
         if not TILES_FOLDER or TILES_FOLDER == 'DESLABS-TILES':
             dftile = conn_tiles.query_to_pandas(qtemplate.format(table_path, i))
-            tiledir = os.path.dirname(dftile.FITS_IMAGES.iloc[0])       # Replace tiledir with path from Matias' table
-            # When running on deslabs, change the file paths to internal directories.
+            try:
+                tiledir = os.path.dirname(dftile.FITS_IMAGES.iloc[0])       # Replace tiledir with path from Matias' table
+            except IndexError as e:
+                logger.warning('Target tile is outside release "{}" footprint: {}'.format(args.release, i))
+                logger.info('Skipping tile {}'.format(i))
+                print('Target tile is outside release "{}" footprint: {}'.format(args.release, i))
+                print('Skipping tile {}'.format(i))
+                continue
+            # For running on deslabs, change the file paths to internal directories.
             if TILES_FOLDER == 'DESLABS-TILES':
                 if args.release in ('Y6A1','Y3A2'):
                     tiledir = tiledir.replace('https://desar2.cosmology.illinois.edu/DESFiles/desarchive/OPS/', '/des003/desarchive/') + '/'
