@@ -104,6 +104,36 @@ def _DecConverter(ra, dec):
     
     return raOUT + decOUT
 
+def _DownloadTiles(outdir, tiledir, downloadlist, tilename, uu, pp):
+    logger = logging.getLogger(__name__)
+
+    # Go through the above list and download the files.
+    for j in range(len(downloadlist)):
+        # Build up the file name that's on the server and its URL.
+        mastertile = tiledir.split('/')[-3] + '_' + tiledir.split('/')[-4] + tiledir.split('/')[-2] + '_' + downloadlist[j]
+        url = tiledir + '/' + mastertile
+
+        # These files are large, so let the user know we're making progress.
+        logger.info('Downloading file {} of {} from URL: {}'.format(j+1, len(downloadlist), url))
+        print('Downloading file {} of {} from URL: {}'.format(j+1, len(downloadlist), url))
+        
+        # Download file from the URL.
+        response = requests.get(url, auth=HTTPBasicAuth(uu, pp)) # Make it easy and use the conn we created earlier.
+        
+        # Check if we got a 404 error and if not, write the file to disk.
+        if response:
+            open(os.path.join(outdir, 'DownloadedTiles', tilename, mastertile), 'wb').write(response.content)
+        else:
+            logger.info('Something went wrong with the request. Cannot download file.')
+            print('Something went wrong with the request. Cannot download file.')
+
+def _RerouteTileDirectory(tiledir, datarelease):
+    if datarelease in ('Y6A1','Y3A2'):
+        tiledir = tiledir.replace('https://desar2.cosmology.illinois.edu/DESFiles/desarchive/OPS/', '/des003/desarchive/') + '/'
+    if datarelease in ('SVA1', 'Y1A1'):
+        tiledir = tiledir.replace('https://desar2.cosmology.illinois.edu/DESFiles/desardata/OPS/coadd/', '/des004/coadd/') + '/'
+    return tiledir
+
 def MakeRGBLupton(df, p, xs, ys, r, g, b, w, bp, s, q):
     pixelscale = utils.proj_plane_pixel_scales(w)
     dx = int(0.5 * xs * ARCMIN_TO_DEG / pixelscale[0])        # pixelscale is in degrees (CUNIT)
@@ -652,7 +682,8 @@ def run(args):
         if not TILES_FOLDER or TILES_FOLDER == 'DESLABS-TILES':
             dftile = conn_tiles.query_to_pandas(qtemplate.format(table_path, i))
             try:
-                tiledir = os.path.dirname(dftile.FITS_IMAGES.iloc[0])       # Replace tiledir with path from Matias' table
+                # Replace tiledir with path from Matias' table
+                tiledir = os.path.dirname(dftile.FITS_IMAGES.iloc[0])
             except IndexError as e:
                 logger.warning('Target tile is outside release "{}" footprint: {}'.format(args.release, i))
                 logger.info('Skipping tile {}'.format(i))
@@ -661,11 +692,9 @@ def run(args):
                 continue
             # For running on deslabs, change the file paths to internal directories.
             if TILES_FOLDER == 'DESLABS-TILES':
-                if args.release in ('Y6A1','Y3A2'):
-                    tiledir = tiledir.replace('https://desar2.cosmology.illinois.edu/DESFiles/desarchive/OPS/', '/des003/desarchive/') + '/'
-                if args.release in ('SVA1', 'Y1A1'):
-                    tiledir = tiledir.replace('https://desar2.cosmology.illinois.edu/DESFiles/desardata/OPS/coadd/', '/des004/coadd/') + '/'
+                tiledir = _RerouteTileDirectory(tiledir, args.release)
                 logger.info('Using DB and table {} to determine tile paths...'.format(table_path))
+                print('Using DB and table {} to determine tile paths...'.format(table_path))
             else:
                 # Create tile directory in output folder (outdir) called 'DownloadedTiles' with subdirectories for the current tile name.
                 os.makedirs(os.path.join(outdir,'DownloadedTiles', i), exist_ok=True)
@@ -687,25 +716,7 @@ def run(args):
                 if args.make_tiffs or args.make_pngs:
                     downloadlist.append('irg.tiff')
 
-                # Go through the above list and download the files.
-                for j in range(len(downloadlist)):
-                    # Build up the file name that's on the server and its URL.
-                    mastertile = tiledir.split('/')[-3] + '_' + tiledir.split('/')[-4] + tiledir.split('/')[-2] + '_' + downloadlist[j]
-                    url = tiledir + '/' + mastertile
-
-                    # These files are large, so let the user know we're making progress.
-                    logger.info('Downloading file {} of {} from URL: {}'.format(j+1, len(downloadlist), url))
-                    print('Downloading file {} of {} from URL: {}'.format(j+1, len(downloadlist), url))
-                    
-                    # Download file from the URL.
-                    response = requests.get(url, auth=HTTPBasicAuth(conn_tiles.user, conn_tiles.password)) # Make it easy and use the conn we created earlier.
-                    
-                    # Check if we got a 404 error and if not, write the file to disk.
-                    if response:
-                        open(os.path.join(outdir, 'DownloadedTiles', i, mastertile), 'wb').write(response.content)
-                    else:
-                        logger.info('Something went wrong with the request. Cannot download file.')
-                        print('Something went wrong with the request. Cannot download file.')
+                _DownloadTiles(outdir, tiledir, downloadlist, i, conn_tiles.user, conn_tiles.password)
 
                 tiledir = os.path.join(outdir, 'DownloadedTiles', i) + '/'
         else:
