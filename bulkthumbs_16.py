@@ -195,29 +195,27 @@ def MakeRGB(tiledir, outdir, df, positions, xs, ys, colors, makestiff, makelupto
 
             try:
                 file_r = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[0]))
+                r, header = fits.getdata(file_r[0], 'SCI', header=True)
             except IndexError:
                 print('No FITS file in {0} band found for object {1}. Will not create RGB cutout.'.format(c[0], nm))
                 logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not create RGB cutout.'.format(c[0], nm))
                 continue
             else:
-                r, header = fits.getdata(file_r[0], 'SCI', header=True)
                 w = WCS(header)
             try:
                 file_g = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[1]))
+                g = fits.getdata(file_g[0], 'SCI')
             except IndexError:
                 print('No FITS file in {0} band found for object {1}. Will not create RGB cutout.'.format(c[1], nm))
                 logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not create RGB cutout.'.format(c[1], nm))
                 continue
-            else:
-                g = fits.getdata(file_g[0], 'SCI')
             try:
                 file_b = glob.glob(outdir+'{0}_{1}.fits'.format(nm, c[2]))
+                b = fits.getdata(file_b[0], 'SCI')
             except IndexError:
                 print('No FITS file in {0} band found for object {1}. Will not create RGB cutout.'.format(c[2], nm))
                 logger.error('MakeLuptonRGB - No FITS file in {0} band found for {1}. Will not create RGB cutout.'.format(c[2], nm))
                 continue
-            else:
-                b = fits.getdata(file_b[0], 'SCI')
 
             if makelupton:
                 luptonnm = filenm + '_lupton'
@@ -733,7 +731,7 @@ def run(args):
         
         if args.make_fits:
             MakeFitsCut(tiledir, outdir+i+'/', size, positions, colors_fits, udf)
-        
+
         if args.make_rgb_lupton or args.make_rgb_stiff:
             luptonargs = [args.rgb_minimum, args.rgb_stretch, args.rgb_asinh]
             MakeRGB(tiledir, outdir+i+'/', udf, positions, xs, ys, colors_rgb, args.make_rgb_stiff, args.make_rgb_lupton, luptonargs)
